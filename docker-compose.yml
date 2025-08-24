@@ -1,0 +1,8 @@
+services:
+  hextech-gunblade:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /hextech-gunblade
+    command: ["bun", "dev"]
+
