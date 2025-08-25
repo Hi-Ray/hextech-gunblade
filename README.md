@@ -1,5 +1,5 @@
 # hextech-gunblade
-[![status-badge](https://ci.hiray.me/api/badges/1/status.svg)](https://ci.hiray.me/repos/1)
+[![Build Status](https://ci.hiray.me/api/badges/Hi-Ray/hextech-gunblade/status.svg)](https://ci.hiray.me/Hi-Ray/hextech-gunblade)
 
 ## An automated scraper for all assets for minigames in the lcu
 
