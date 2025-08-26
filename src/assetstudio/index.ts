@@ -3,7 +3,7 @@ import process from 'process';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-import download from 'download';
+import { download } from '@utils/safeDL.ts';
 import logger from 'signale';
 import extract from 'extract-zip';
 
@@ -255,13 +255,7 @@ export async function downloadAllVO(
                 );
             }
 
-            const localevodl = await Promise.allSettled(localedl);
-
-            localevodl.forEach((locale, i) => {
-                if (locale.status === 'rejected') {
-                    logger.warn(`failed to download a locale VO`);
-                }
-            });
+            await Promise.allSettled(localedl);
         } catch {
             // empty
         }

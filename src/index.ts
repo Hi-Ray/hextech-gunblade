@@ -34,6 +34,14 @@ export const TempDir =
         ? process.env.TEMP_DIR
         : path.join(__dirname, '../tmp/');
 
+process.on('unhandledRejection', (reason, promise) => {
+    logger.debug('💥 Unhandled rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    logger.error('💥 Uncaught Exception:', err.message);
+});
+
 // License notice
 console.log(
     `InfinityEdge Copyright (C) ${currentYear} Hi-Ray & Contributors ` +
@@ -61,22 +69,22 @@ const ftp = checkEnvironment();
 logger.warn('Getting lol events');
 const events = await getLolEvents();
 
-const bundles: Promise<void>[] = [];
-
-for await (const event of events) {
-    bundles.push(downloadBundles(event.link, event.eventName, event.subPath));
-}
-
-const bundlesResult = await Promise.allSettled(bundles);
-
-bundlesResult.forEach((bundle, i) => {
-    if (bundle.status === 'fulfilled') {
-        logger.info(`Downloaded bundle for ${events[i]?.eventName}`);
-    }
-});
-
-logger.warn('Starting minigame extractor');
-await startMiniGameExtractor();
+// const bundles: Promise<void>[] = [];
+//
+// for await (const event of events) {
+//     bundles.push(downloadBundles(event.link, event.eventName, event.subPath));
+// }
+//
+// const bundlesResult = await Promise.allSettled(bundles);
+//
+// bundlesResult.forEach((bundle, i) => {
+//     if (bundle.status === 'fulfilled') {
+//         logger.info(`Downloaded bundle for ${events[i]?.eventName}`);
+//     }
+// });
+//
+// logger.warn('Starting minigame extractor');
+// await startMiniGameExtractor();
 
 const audioDownload: Promise<void>[] = [];
 const final: Promise<void>[] = [];
@@ -114,7 +122,7 @@ adP.forEach((audio, i) => {
 
 finalP.forEach((final, i) => {
     if (final.status === 'fulfilled') {
-        logger.info(`Completed ${i} of ${finalP.length}`);
+        logger.info(`Completed ${i + 1} of ${finalP.length}`);
     }
 });
 
