@@ -9,7 +9,7 @@ import path from 'path';
  * @param {string} substring - Substring to look for in filenames
  * @returns {Promise<string[]>} - An array of absolute file paths
  */
-export async function findFilesContaining(dir: string, substring: string) {
+export async function findFilesContaining(dir: string, substring: string): Promise<string[]> {
     let results: string[] = [];
     const absDir = path.resolve(dir); // make sure base dir is absolute
     const entries = await fs.readdir(absDir, { withFileTypes: true });

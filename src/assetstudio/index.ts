@@ -40,7 +40,9 @@ export async function unzipAS() {
     const filename = `AssetStudioModCLI_net6_${getASOS()}.zip`;
 
     await extract(path.join(ASDir, filename), { dir: ASDir });
-    await fs.chmod(path.join(ASDir, 'AssetStudioModCLI'), 0o755);
+    if (os.platform() !== 'win32') {
+        await fs.chmod(path.join(ASDir, 'AssetStudioModCLI'), 0o755);
+    }
 }
 
 export async function useAssetStudioWin(
@@ -239,22 +241,33 @@ export async function downloadAllVO(
             const cdragonLocales = await fetchCdragonLocales();
             const locales = Object.keys(cdragonLocales);
 
+            const localedl: Promise<Buffer>[] = [];
             for (const locale of locales) {
-                await download(
-                    (await getFileBase(eventLink)) +
-                        replaceLocalePlaceholder('/AudioLocales/{locale}/{locale}_', locale) +
-                        value +
-                        '.ogg',
-                    path.join(
-                        ExportDir,
-                        'lol',
-                        eventName,
-                        subPath.split('?')[0] || subPath,
-                        'Assets',
-                        'Audio'
+                localedl.push(
+                    download(
+                        (await getFileBase(eventLink)) +
+                            replaceLocalePlaceholder('/AudioLocales/{locale}/{locale}_', locale) +
+                            value +
+                            '.ogg',
+                        path.join(
+                            ExportDir,
+                            'lol',
+                            eventName,
+                            subPath.split('?')[0] || subPath,
+                            'Assets',
+                            'Audio'
+                        )
                     )
                 );
             }
+
+            const localevodl = await Promise.allSettled(localedl);
+
+            localevodl.forEach((locale, i) => {
+                if (locale.status === 'rejected') {
+                    logger.warn(`failed to download a locale VO`);
+                }
+            });
         } catch {
             // empty
         }
@@ -268,6 +281,9 @@ export async function finalSweep(eventName: string, eventSubpath: string, eventL
     );
 
     logger.warn('DOING FINAL SWEEP');
+
+    const filesToDl: Promise<Buffer>[] = [];
+    const vodl: Promise<any>[] = [];
 
     for await (const file of jsonFiles) {
         if (file.includes('RiotAudioLoader')) {
@@ -296,15 +312,17 @@ export async function finalSweep(eventName: string, eventSubpath: string, eventL
                 }
 
                 try {
-                    await download(
-                        (await getFileBase(eventLink)) + '/SoundFX/' + value + '.ogg',
-                        path.join(
-                            ExportDir,
-                            'lol',
-                            eventName,
-                            eventSubpath.split('?')[0] || eventSubpath,
-                            'Assets',
-                            'Audio'
+                    filesToDl.push(
+                        download(
+                            (await getFileBase(eventLink)) + '/SoundFX/' + value + '.ogg',
+                            path.join(
+                                ExportDir,
+                                'lol',
+                                eventName,
+                                eventSubpath.split('?')[0] || eventSubpath,
+                                'Assets',
+                                'Audio'
+                            )
                         )
                     );
                 } catch {
@@ -325,8 +343,22 @@ export async function finalSweep(eventName: string, eventSubpath: string, eventL
                     continue;
                 }
 
-                await downloadAllVO(eventName, eventSubpath, eventLink, value);
+                vodl.push(downloadAllVO(eventName, eventSubpath, eventLink, value));
             }
         }
     }
+    const vodld = await Promise.allSettled(vodl);
+    const filedld = await Promise.allSettled(filesToDl);
+
+    vodld.forEach((vo) => {
+        if (vo.status === 'rejected') {
+            /* empty */
+        }
+    });
+
+    filedld.forEach((file) => {
+        if (file.status === 'rejected') {
+            /* empty */
+        }
+    });
 }

@@ -80,14 +80,24 @@ export async function downloadBundles(url: string, eventName: string, subPath: s
             str.replace('{UnityEngine.AddressableAssets.Addressables.RuntimePath}', assetBasePath)
         );
 
+    const bundlesDL: Promise<Buffer>[] = [];
+
     for (const bundle of bundles) {
-        try {
-            await download(
+        bundlesDL.push(
+            download(
                 bundle,
                 path.join(TempDir, eventName, subPath.split('?')[0] || subPath, 'bundles')
-            );
-        } catch (e) {
-            logger.error(e);
-        }
+            )
+        );
     }
+
+    const bundlesdld = await Promise.allSettled(bundlesDL);
+
+    bundlesdld.forEach((bundle, i) => {
+        if (bundle.status === 'fulfilled') {
+            logger.info(`Bundle: ${bundles[i]} Downloaded`);
+        } else {
+            logger.warn(`unable to download bundle: ${bundles[i]}`);
+        }
+    });
 }

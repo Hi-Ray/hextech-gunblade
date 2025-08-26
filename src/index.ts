@@ -61,13 +61,25 @@ const ftp = checkEnvironment();
 logger.warn('Getting lol events');
 const events = await getLolEvents();
 
+const bundles: Promise<void>[] = [];
+
 for await (const event of events) {
-    logger.warn(`Getting lol events bundle: ${event.eventName};${event.subPath}`);
-    await downloadBundles(event.link, event.eventName, event.subPath);
+    bundles.push(downloadBundles(event.link, event.eventName, event.subPath));
 }
+
+const bundlesResult = await Promise.allSettled(bundles);
+
+bundlesResult.forEach((bundle, i) => {
+    if (bundle.status === 'fulfilled') {
+        logger.info(`Downloaded bundle for ${events[i]?.eventName}`);
+    }
+});
 
 logger.warn('Starting minigame extractor');
 await startMiniGameExtractor();
+
+const audioDownload: Promise<void>[] = [];
+const final: Promise<void>[] = [];
 
 for await (const event of events) {
     const subPath = event.subPath.split('?')[0] || event.subPath;
@@ -86,13 +98,25 @@ for await (const event of events) {
         continue;
     }
 
-    await downloadAudio(list);
-    try {
-        await finalSweep(event.eventName, event.subPath, event.link);
-    } catch {
-        /* empty */
-    }
+    audioDownload.push(downloadAudio(list));
+
+    final.push(finalSweep(event.eventName, event.subPath, event.link));
 }
+
+const adP = await Promise.allSettled(audioDownload);
+const finalP = await Promise.allSettled(final);
+
+adP.forEach((audio, i) => {
+    if (audio.status === 'fulfilled') {
+        logger.info(`Audio Downloaded`);
+    }
+});
+
+finalP.forEach((final, i) => {
+    if (final.status === 'fulfilled') {
+        logger.info(`Completed ${i} of ${finalP.length}`);
+    }
+});
 
 if (ftp) {
     await sync();

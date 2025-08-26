@@ -1,11 +1,7 @@
-import * as cheerio from 'cheerio';
-import * as fs from 'fs/promises';
 import logger from 'signale';
 import axios from 'axios';
 
 import { replaceEventPlaceholder, replaceLocalePlaceholder } from '@utils/string.ts';
-
-import { ExportDir } from '~/index.ts';
 
 import type { LolHomepageRoot, LolData } from '@interfaces/lolhomepage.interface.ts';
 import type { TftRoot } from '@interfaces/tfthomepage.interface.ts';
@@ -51,47 +47,39 @@ export function parseTftEventName(str: string) {
  *
  * @returns {Promise<LolData[]>}
  */
-export function getLolHomepages() {
+export async function getLolHomepages(): Promise<LolData[]> {
     const homepage = replaceLocalePlaceholder(homepageUrls['lol'], 'en_US');
 
-    return axios
-        .get(homepage)
-        .then((res) => {
-            const lolHomepage: LolHomepageRoot = res.data;
+    try {
+        const res = await axios.get(homepage);
+        const lolHomepage: LolHomepageRoot = res.data;
 
-            const whitelist: LolData[] = [];
-            for (const homepagedata of lolHomepage.data) {
-                if (titleBlacklist.includes(homepagedata.title)) continue;
+        const whitelist: LolData[] = [];
+        for (const homepagedata of lolHomepage.data) {
+            if (titleBlacklist.includes(homepagedata.title)) continue;
 
-                whitelist.push(homepagedata);
-            }
-
-            return whitelist;
-        })
-        .catch((e) => {
-            logger.error(e);
-            const empty: LolData[] = [];
-
-            return empty;
-        });
+            whitelist.push(homepagedata);
+        }
+        return whitelist;
+    } catch {
+        const empty: LolData[] = [];
+        return empty;
+    }
 }
 
 /**
  * TODO: When an event occurs make logic for capturing data.
  */
-export function getTftHomePages(): Promise<object> {
+export async function getTftHomePages(): Promise<object> {
     const homepage = replaceLocalePlaceholder(homepageUrls['tft'], 'en_US');
 
-    return axios
-        .get(homepage)
-        .then((res) => {
-            const tftHomepage: TftRoot = res.data;
-
-            return {};
-        })
-        .catch(() => {
-            return {};
-        });
+    try {
+        const res = await axios.get(homepage);
+        const tftHomepage: TftRoot = res.data;
+        return {};
+    } catch {
+        return {};
+    }
 }
 
 /**
@@ -100,7 +88,7 @@ export function getTftHomePages(): Promise<object> {
  *   lol: LolData
  * }
  */
-export async function getHomepages() {
+export async function getHomepages(): Promise<any> {
     const lolHomepages: LolData[] = await getLolHomepages();
     const tftHomePages = getTftHomePages();
 
@@ -114,7 +102,7 @@ export async function getHomepages() {
  *
  * @returns {Promise<string[]>}
  */
-export async function extractLolEvents() {
+export async function extractLolEvents(): Promise<string[]> {
     const homepages = await getHomepages();
 
     const data = [];
