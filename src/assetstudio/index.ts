@@ -177,7 +177,7 @@ export async function extractAudioList(eventName: string, subPath: string, event
 
 export async function downloadAudio(fileList: FileList[]) {
     const cdragonLocales = Object.keys(await fetchCdragonLocales());
-    const toDL: Promise<Buffer>[] = [];
+    const toDL: Promise<Buffer | null>[] = [];
 
     for (const file of fileList) {
         toDL.push(download(file.soundFX, file.location));
@@ -235,7 +235,7 @@ export async function downloadAllVO(
             const cdragonLocales = await fetchCdragonLocales();
             const locales = Object.keys(cdragonLocales);
 
-            const localedl: Promise<Buffer>[] = [];
+            const localedl: Promise<Buffer | null>[] = [];
             for (const locale of locales) {
                 localedl.push(
                     download(
@@ -270,7 +270,7 @@ export async function finalSweep(eventName: string, eventSubpath: string, eventL
 
     logger.warn('DOING FINAL SWEEP');
 
-    const filesToDl: Promise<Buffer>[] = [];
+    const filesToDl: Promise<Buffer | null>[] = [];
     const vodl: Promise<any>[] = [];
 
     for await (const file of jsonFiles) {
