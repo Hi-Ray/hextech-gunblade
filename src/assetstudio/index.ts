@@ -114,18 +114,17 @@ export async function useAssetStudio(eventName: string, assetsFolder: string, su
 
 export async function extractAllEvents() {
     const events = await getDirectories(path.join(TempDir));
+    const queue: Promise<void>[] = [];
 
     for (const event of events) {
         const miniGameDirs = await getDirectories(path.join(TempDir, event));
 
         for (const miniGameDir of miniGameDirs) {
-            try {
-                await useAssetStudio(event, path.join(TempDir, event, miniGameDir), miniGameDir);
-            } catch (e) {
-                logger.error(e);
-            }
+            queue.push(useAssetStudio(event, path.join(TempDir, event, miniGameDir), miniGameDir));
         }
     }
+
+    await Promise.allSettled(queue);
 }
 
 export async function startMiniGameExtractor() {
@@ -178,24 +177,19 @@ export async function extractAudioList(eventName: string, subPath: string, event
 
 export async function downloadAudio(fileList: FileList[]) {
     const cdragonLocales = Object.keys(await fetchCdragonLocales());
+    const toDL: Promise<Buffer>[] = [];
 
     for (const file of fileList) {
+        toDL.push(download(file.soundFX, file.location));
+
+        toDL.push(download(file.VO, file.location));
+
         for (const locale of cdragonLocales) {
-            try {
-                await download(file.soundFX, file.location);
-            } catch {
-                try {
-                    await download(file.VO, file.location);
-                } catch {
-                    try {
-                        await download(file.VO_LOCAL.replaceAll('{locale}', locale), file.location);
-                    } catch {
-                        // Empty
-                    }
-                }
-            }
+            toDL.push(download(file.VO_LOCAL.replaceAll('{locale}', locale), file.location));
         }
     }
+
+    await Promise.allSettled(toDL);
 }
 
 export function splitDir(path: string, amount: number) {
@@ -347,18 +341,6 @@ export async function finalSweep(eventName: string, eventSubpath: string, eventL
             }
         }
     }
-    const vodld = await Promise.allSettled(vodl);
-    const filedld = await Promise.allSettled(filesToDl);
-
-    vodld.forEach((vo) => {
-        if (vo.status === 'rejected') {
-            /* empty */
-        }
-    });
-
-    filedld.forEach((file) => {
-        if (file.status === 'rejected') {
-            /* empty */
-        }
-    });
+    await Promise.allSettled(vodl);
+    await Promise.allSettled(filesToDl);
 }
