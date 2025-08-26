@@ -69,22 +69,22 @@ const ftp = checkEnvironment();
 logger.warn('Getting lol events');
 const events = await getLolEvents();
 
-// const bundles: Promise<void>[] = [];
-//
-// for await (const event of events) {
-//     bundles.push(downloadBundles(event.link, event.eventName, event.subPath));
-// }
-//
-// const bundlesResult = await Promise.allSettled(bundles);
-//
-// bundlesResult.forEach((bundle, i) => {
-//     if (bundle.status === 'fulfilled') {
-//         logger.info(`Downloaded bundle for ${events[i]?.eventName}`);
-//     }
-// });
-//
-// logger.warn('Starting minigame extractor');
-// await startMiniGameExtractor();
+const bundles: Promise<void>[] = [];
+
+for await (const event of events) {
+    bundles.push(downloadBundles(event.link, event.eventName, event.subPath));
+}
+
+const bundlesResult = await Promise.allSettled(bundles);
+
+bundlesResult.forEach((bundle, i) => {
+    if (bundle.status === 'fulfilled') {
+        logger.info(`Downloaded bundle for ${events[i]?.eventName}`);
+    }
+});
+
+logger.warn('Starting minigame extractor');
+await startMiniGameExtractor();
 
 const audioDownload: Promise<void>[] = [];
 const final: Promise<void>[] = [];
