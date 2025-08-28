@@ -84,7 +84,12 @@ bundlesResult.forEach((bundle, i) => {
 });
 
 logger.warn('Starting minigame extractor');
-await startMiniGameExtractor();
+try {
+    await startMiniGameExtractor();
+} catch {
+    logger.warn('no events found');
+    process.exit(0);
+}
 
 const audioDownload: Promise<void>[] = [];
 const final: Promise<void>[] = [];
