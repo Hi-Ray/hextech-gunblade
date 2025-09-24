@@ -7,7 +7,7 @@ import { download } from '@utils/safeDL.ts';
 import logger from 'signale';
 import extract from 'extract-zip';
 
-import { ASDir, ExportDir, TempDir } from '~/index.ts';
+import { ASDir, ExportDir, TempDir } from '~/dirs.ts';
 import { findFilesContaining } from '@utils/fs.ts';
 import type { RiotAudioLoaderRoot } from '@interfaces/riotaudioloader.interface.ts';
 import type { FileList } from '@interfaces/audiolist.interface.ts';

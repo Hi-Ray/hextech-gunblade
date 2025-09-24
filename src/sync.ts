@@ -5,7 +5,7 @@ import * as fs from 'fs/promises';
 import path from 'path';
 
 import logger from 'signale';
-import { ExportDir } from '~/index.ts';
+import { ExportDir } from '~/dirs.ts';
 
 const currentYear = new Date().getFullYear();
 const currentMonth = ('0' + (new Date().getMonth() + 1)).slice(-2);

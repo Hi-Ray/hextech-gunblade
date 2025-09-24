@@ -4,35 +4,16 @@ import logger from 'signale';
 import * as process from 'process';
 import { checkEnvironment, sync } from '~/sync.ts';
 
-import path from 'path';
-
 import { downloadAudio, extractAudioList, finalSweep, startMiniGameExtractor } from '~/assetstudio';
 import { downloadBundles } from '@stormrazor/getter.ts';
 import { getLolEvents } from '~/scraper.ts';
 
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import path from 'path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { ExportDir, TempDir } from '~/dirs.ts';
 
 // Date for the license notice
 export const currentYear = new Date().getFullYear();
-
-export const ExportDir =
-    process.env.EXPORT_DIR && process.env.EXPORT_DIR.trim() !== ''
-        ? process.env.EXPORT_DIR
-        : path.join(__dirname, '../events/');
-
-export const ASDir =
-    process.env.AS_DIR && process.env.AS_DIR.trim() !== ''
-        ? process.env.AS_DIR
-        : path.join(__dirname, '../asset-studio/');
-
-export const TempDir =
-    process.env.TEMP_DIR && process.env.TEMP_DIR.trim() !== ''
-        ? process.env.TEMP_DIR
-        : path.join(__dirname, '../tmp/');
 
 process.on('unhandledRejection', (reason, promise) => {
     logger.debug('💥 Unhandled rejection:', reason);
@@ -44,13 +25,13 @@ process.on('uncaughtException', (err) => {
 
 // License notice
 console.log(
-    `InfinityEdge Copyright (C) ${currentYear} Hi-Ray & Contributors ` +
+    `hextech-gunblade Copyright (C) ${currentYear} Hi-Ray & Contributors ` +
         '\nThis program comes with ABSOLUTELY NO WARRANTY;' +
         '\nThis is free software, and you are welcome to redistribute it under certain conditions;' +
         '\nPlease see LICENSE.md'
 );
 
-console.log(`InfinityEdge Version: ${version}`);
+console.log(`hextech-gunblade Version: ${version}`);
 console.log('');
 
 // Start
@@ -68,28 +49,28 @@ const ftp = checkEnvironment();
 
 logger.warn('Getting lol events');
 const events = await getLolEvents();
-
-const bundles: Promise<void>[] = [];
-
-for await (const event of events) {
-    bundles.push(downloadBundles(event.link, event.eventName, event.subPath));
-}
-
-const bundlesResult = await Promise.allSettled(bundles);
-
-bundlesResult.forEach((bundle, i) => {
-    if (bundle.status === 'fulfilled') {
-        logger.info(`Downloaded bundle for ${events[i]?.eventName}`);
-    }
-});
-
-logger.warn('Starting minigame extractor');
-try {
-    await startMiniGameExtractor();
-} catch {
-    logger.warn('no events found');
-    process.exit(0);
-}
+//
+// const bundles: Promise<void>[] = [];
+//
+// for await (const event of events) {
+//     bundles.push(downloadBundles(event.link, event.eventName, event.subPath));
+// }
+//
+// const bundlesResult = await Promise.allSettled(bundles);
+//
+// bundlesResult.forEach((bundle, i) => {
+//     if (bundle.status === 'fulfilled') {
+//         logger.info(`Downloaded bundle for ${events[i]?.eventName}`);
+//     }
+// });
+//
+// logger.warn('Starting minigame extractor');
+// try {
+//     await startMiniGameExtractor();
+// } catch {
+//     logger.warn('no events found');
+//     process.exit(0);
+// }
 
 const audioDownload: Promise<void>[] = [];
 const final: Promise<void>[] = [];
@@ -99,7 +80,6 @@ for await (const event of events) {
     logger.info(
         `Fetching RiotAudioLoader ${path.join('events', 'lol', event.eventName)};${subPath}`
     );
-
     const list = await extractAudioList(
         path.join(ExportDir, 'lol', event.eventName),
         subPath,

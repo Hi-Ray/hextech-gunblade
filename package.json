@@ -5,7 +5,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun run src"
+    "dev": "bun run src",
+    "dev:debug": "bun --inspect src"
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",

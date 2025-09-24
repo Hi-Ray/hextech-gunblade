@@ -3,36 +3,58 @@ import axios from 'axios';
 import logger from 'signale';
 import download from 'download';
 import path from 'path';
+import fs from 'fs/promises';
 
 import type { LolCatalogRoot } from '@interfaces/lolcatalog.interface.ts';
-import { TempDir } from '~/index.ts';
+import { TempDir } from '~/dirs.ts';
+import {
+    getAddressableTools,
+    getBinBundles,
+    unzipAddressableTools,
+    useAddressableTools,
+} from '~/addressabletools';
+
+const cache = new Map<string, string>();
 
 export async function getFileBase(url: string) {
-    const res = await axios.get(url);
+    try {
+        let data;
 
-    const data = res.data;
+        if (cache.has(url)) {
+            data = cache.get(url)!;
+        } else {
+            const res = await axios.get(url);
 
-    const $ = cheerio.load(data);
+            logger.debug(`Fetching data for ${url}`);
 
-    let filebase = '';
+            data = res.data;
 
-    $('script').each((i, el) => {
-        if (!el.attribs.src) {
-            return;
+            cache.set(url, data);
         }
+        const $ = cheerio.load(data);
+        let filebase = '';
 
-        const src = el.attribs.src;
+        $('script').each((i, el) => {
+            if (!el.attribs.src) {
+                return;
+            }
 
-        if (src.includes('webpack-')) {
-            const cleanUrl = src
-                .split('/')
-                .splice(0, src.split('/').length - 4)
-                .join('/');
+            const src = el.attribs.src;
 
-            filebase = cleanUrl + '/WebGLBuild/StreamingAssets';
-        }
-    });
-    return filebase;
+            if (src.includes('webpack-')) {
+                const cleanUrl = src
+                    .split('/')
+                    .splice(0, src.split('/').length - 4)
+                    .join('/');
+
+                filebase = cleanUrl + '/WebGLBuild/StreamingAssets';
+            }
+        });
+        return filebase;
+    } catch (e) {
+        logger.error((e as any).message);
+        throw new Error('Unable to get file base');
+    }
 }
 
 export async function getCatalog(url: string) {
@@ -60,10 +82,63 @@ export async function getCatalog(url: string) {
             catalogUrl = cleanUrl + '/WebGLBuild/StreamingAssets/aa/catalog.json';
         }
     });
-    return catalogUrl;
+
+    return axios
+        .get(catalogUrl)
+        .then(() => {
+            return catalogUrl;
+        })
+        .catch(() => {
+            return catalogUrl.replace('catalog.json', 'catalog.bin');
+        });
 }
 
-export async function downloadBundles(url: string, eventName: string, subPath: string) {
+export async function downloadBinBundles(url: string, eventName: string, subPath: string) {
+    const binFileLocation = path.join(TempDir, eventName, subPath.split('?')[0] || subPath, 'bin');
+
+    download(url, binFileLocation);
+
+    const binFile = await fs.readFile(path.join(binFileLocation, 'catalog.bin'));
+
+    await getAddressableTools();
+    await unzipAddressableTools();
+
+    const binData = await useAddressableTools(binFile.toString());
+
+    const assetBasePath = url
+        .split('/')
+        .splice(0, url.split('/').length - 1)
+        .join('/');
+
+    const binBundles = await getBinBundles(binData);
+
+    const bundles = binBundles.map((str) =>
+        str.replace('{UnityEngine.AddressableAssets.Addressables.RuntimePath}', assetBasePath)
+    );
+
+    const bundlesDL: Promise<Buffer>[] = [];
+
+    for (const bundle of bundles) {
+        bundlesDL.push(
+            download(
+                bundle,
+                path.join(TempDir, eventName, subPath.split('?')[0] || subPath, 'bundles')
+            )
+        );
+    }
+
+    const bundlesdld = await Promise.allSettled(bundlesDL);
+
+    bundlesdld.forEach((bundle, i) => {
+        if (bundle.status === 'fulfilled') {
+            logger.info(`Bundle: ${bundles[i]} Downloaded`);
+        } else {
+            logger.warn(`unable to download bundle: ${bundles[i]}`);
+        }
+    });
+}
+
+export async function downloadJsonBundles(url: string, eventName: string, subPath: string) {
     const catalogUrl = await getCatalog(url);
 
     const assetBasePath = catalogUrl
@@ -100,4 +175,14 @@ export async function downloadBundles(url: string, eventName: string, subPath: s
             logger.warn(`unable to download bundle: ${bundles[i]}`);
         }
     });
+}
+
+export async function downloadBundles(url: string, eventName: string, subPath: string) {
+    const catalogUrl = await getCatalog(url);
+
+    if (catalogUrl.includes('bin')) {
+        await downloadBinBundles(url, eventName, subPath);
+    } else {
+        await downloadJsonBundles(url, eventName, subPath);
+    }
 }
