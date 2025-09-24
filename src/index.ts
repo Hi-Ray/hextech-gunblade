@@ -10,7 +10,7 @@ import { getLolEvents } from '~/scraper.ts';
 
 import path from 'path';
 
-import { ExportDir, TempDir } from '~/dirs.ts';
+import { ExportDir } from '~/dirs.ts';
 
 // Date for the license notice
 export const currentYear = new Date().getFullYear();
@@ -49,28 +49,28 @@ const ftp = checkEnvironment();
 
 logger.warn('Getting lol events');
 const events = await getLolEvents();
-//
-// const bundles: Promise<void>[] = [];
-//
-// for await (const event of events) {
-//     bundles.push(downloadBundles(event.link, event.eventName, event.subPath));
-// }
-//
-// const bundlesResult = await Promise.allSettled(bundles);
-//
-// bundlesResult.forEach((bundle, i) => {
-//     if (bundle.status === 'fulfilled') {
-//         logger.info(`Downloaded bundle for ${events[i]?.eventName}`);
-//     }
-// });
-//
-// logger.warn('Starting minigame extractor');
-// try {
-//     await startMiniGameExtractor();
-// } catch {
-//     logger.warn('no events found');
-//     process.exit(0);
-// }
+
+const bundles: Promise<void>[] = [];
+
+for await (const event of events) {
+    bundles.push(downloadBundles(event.link, event.eventName, event.subPath));
+}
+
+const bundlesResult = await Promise.allSettled(bundles);
+
+bundlesResult.forEach((bundle, i) => {
+    if (bundle.status === 'fulfilled') {
+        logger.info(`Downloaded bundle for ${events[i]?.eventName}`);
+    }
+});
+
+logger.warn('Starting minigame extractor');
+try {
+    await startMiniGameExtractor();
+} catch {
+    logger.warn('no events found');
+    process.exit(0);
+}
 
 const audioDownload: Promise<void>[] = [];
 const final: Promise<void>[] = [];
