@@ -14,7 +14,7 @@ RUN wget wget https://packages.microsoft.com/config/debian/12/packages-microsoft
     && rm packages-microsoft-prod.deb
 
 
-RUN apt-get update && apt-get install -y aspnetcore-runtime-9.0 aspnetcore-runtime-8.0
+RUN apt-get update && apt-get install -y dotnet-runtime-9.0 dotnet-runtime-8.0
 
 
 WORKDIR /hextech-gunblade
