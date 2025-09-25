@@ -3,7 +3,6 @@ import axios from 'axios';
 import logger from 'signale';
 import download from 'download';
 import path from 'path';
-import fs from 'fs/promises';
 
 import type { LolCatalogRoot } from '@interfaces/lolcatalog.interface.ts';
 import { TempDir } from '~/dirs.ts';
@@ -24,8 +23,6 @@ export async function getFileBase(url: string) {
             data = cache.get(url)!;
         } else {
             const res = await axios.get(url);
-
-            logger.debug(`Fetching data for ${url}`);
 
             data = res.data;
 
@@ -58,6 +55,7 @@ export async function getFileBase(url: string) {
 }
 
 export async function getCatalog(url: string) {
+    logger.debug(`Fetching catalog for ${url}`);
     const res = await axios.get(url);
 
     const data = res.data;
@@ -65,6 +63,7 @@ export async function getCatalog(url: string) {
     const $ = cheerio.load(data);
 
     let catalogUrl = '';
+    let clean = '';
 
     $('script').each((i, el) => {
         if (!el.attribs.src) {
@@ -80,40 +79,46 @@ export async function getCatalog(url: string) {
                 .join('/');
 
             catalogUrl = cleanUrl + '/WebGLBuild/StreamingAssets/aa/catalog.json';
+            clean = cleanUrl;
         }
     });
 
     return axios
-        .get(catalogUrl)
+        .get(clean + '/Comic/WebGLBuild/StreamingAssets/aa/catalog.bin')
         .then(() => {
-            return catalogUrl;
+            return clean + '/Comic/WebGLBuild/StreamingAssets/aa/catalog.bin';
         })
         .catch(() => {
-            return catalogUrl.replace('catalog.json', 'catalog.bin');
+            return catalogUrl;
         });
 }
 
 export async function downloadBinBundles(url: string, eventName: string, subPath: string) {
+    logger.info('downloading bundles with addrtool');
+
     const binFileLocation = path.join(TempDir, eventName, subPath.split('?')[0] || subPath, 'bin');
 
-    download(url, binFileLocation);
+    const catalogUrl = await getCatalog(url);
 
-    const binFile = await fs.readFile(path.join(binFileLocation, 'catalog.bin'));
+    download(catalogUrl, binFileLocation);
 
     await getAddressableTools();
     await unzipAddressableTools();
 
-    const binData = await useAddressableTools(binFile.toString());
-
-    const assetBasePath = url
-        .split('/')
-        .splice(0, url.split('/').length - 1)
-        .join('/');
+    const binData = await useAddressableTools(path.join(binFileLocation, 'catalog.bin'));
 
     const binBundles = await getBinBundles(binData);
 
+    logger.info(`Found ${binBundles.length} bundles`);
+
     const bundles = binBundles.map((str) =>
-        str.replace('{UnityEngine.AddressableAssets.Addressables.RuntimePath}', assetBasePath)
+        str.replace(
+            '{UnityEngine.AddressableAssets.Addressables.RuntimePath}',
+            catalogUrl
+                .split('/')
+                .splice(0, catalogUrl.split('/').length - 1)
+                .join('/')
+        )
     );
 
     const bundlesDL: Promise<Buffer>[] = [];
@@ -181,8 +186,10 @@ export async function downloadBundles(url: string, eventName: string, subPath: s
     const catalogUrl = await getCatalog(url);
 
     if (catalogUrl.includes('bin')) {
+        logger.info('catalog.bin found, downloading bundles with addrtool');
         await downloadBinBundles(url, eventName, subPath);
     } else {
+        logger.info('catalog.json found, downloading bundles without addrtool');
         await downloadJsonBundles(url, eventName, subPath);
     }
 }

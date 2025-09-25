@@ -22,41 +22,76 @@ export function getAddressableToolsOs() {
 }
 
 export async function getAddressableTools() {
+    logger.info('Downloading AddressableTools');
     await download(toolsUrl, toolsLocation);
 }
 
 export async function unzipAddressableTools() {
+    logger.info('Unzipping AddressableTools');
     await extract(path.join(toolsLocation, fileName), { dir: toolsLocation });
 }
 
 export async function useAddressableTools(binFile: string) {
+    logger.info('Using AddressableTools');
     const exe = os.platform() === 'win32' ? '.exe' : '';
-    const proc = Bun.spawn([path.join(toolsLocation, `example${exe}`), binFile], {
+
+    const proc = Bun.spawn([path.join(toolsLocation, `example${exe}`), 'searchasset', binFile], {
+        stdin: 'pipe',
         stdout: 'pipe',
         stderr: 'pipe',
     });
 
-    const chunks = [];
+    // Simulate pressing Enter
+    proc.stdin.write('\n');
+    proc.stdin.end();
 
-    for await (const chunk of proc.stdout) {
-        chunks.push(chunk);
-    }
+    const stdoutPromise = (async () => {
+        let out = '';
+        const decoder = new TextDecoder();
+        for await (const chunk of proc.stdout) {
+            out += decoder.decode(chunk);
+        }
+        return out;
+    })();
 
-    const fullOutput = new TextDecoder().decode(Buffer.concat(chunks));
+    const stderrPromise = (async () => {
+        let err = '';
+        const decoder = new TextDecoder();
+        for await (const chunk of proc.stderr) {
+            err += decoder.decode(chunk);
+        }
+        return err;
+    })();
 
-    logger.info(fullOutput);
+    const [exitCode, stdout, stderr] = await Promise.all([
+        proc.exited,
+        stdoutPromise,
+        stderrPromise,
+    ]);
 
-    logger.info(`Process exited with code ${await proc.exited}`);
+    logger.info(`Process exited with code ${exitCode}`);
 
-    return fullOutput;
+    return stdout;
 }
-
 export async function getBinBundles(binData: string) {
-    return binData
-        .split('\n')
-        .filter(
-            (line) =>
-                line.startsWith('{UnityEngine.AddressableAssets.Addressables.RuntimePath}') &&
-                line.endsWith('.bundle')
-        );
+    return [
+        ...new Set(
+            binData
+                .split('\n')
+                .filter((line) =>
+                    line.match(
+                        /\{UnityEngine\.AddressableAssets\.Addressables\.RuntimePath\}.*\.bundle/gimu
+                    )
+                )
+                .map(
+                    (line) =>
+                        line
+                            .replaceAll('\r', '')
+                            .match(
+                                /\{UnityEngine\.AddressableAssets\.Addressables\.RuntimePath\}.*\.bundle/gimu
+                            )?.[0] ?? ''
+                )
+                .filter((line) => line !== '')
+        ),
+    ];
 }
