@@ -67,8 +67,9 @@ bundlesResult.forEach((bundle, i) => {
 logger.warn('Starting minigame extractor');
 try {
     await startMiniGameExtractor();
-} catch {
+} catch (e) {
     logger.warn('no events found');
+    logger.error((e as any).message);
     process.exit(0);
 }
 
