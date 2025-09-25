@@ -219,9 +219,17 @@ export async function downloadAllVO(
         return;
     }
 
+    if (value.trim() === '') return;
+
+    const fileb = (await getFileBase(eventLink)).split('/');
+
+    fileb.splice(-2);
+
+    const filebase = fileb.join('/');
+
     try {
         await download(
-            (await getFileBase(eventLink)) + '/AudioLocales/en_US/' + value + '.ogg',
+            filebase + '/Comic/WebGLBuild/StreamingAssets/AudioLocales/en_US/' + value + '.ogg',
             path.join(
                 ExportDir,
                 'lol',
@@ -242,7 +250,8 @@ export async function downloadAllVO(
             for (const locale of locales) {
                 localedl.push(
                     download(
-                        (await getFileBase(eventLink)) +
+                        filebase +
+                            '/Comic/WebGLBuild/StreamingAssets/' +
                             replaceLocalePlaceholder('/AudioLocales/{locale}/{locale}_', locale) +
                             value +
                             '.ogg',
@@ -262,6 +271,54 @@ export async function downloadAllVO(
         } catch {
             // empty
         }
+
+        try {
+            await download(
+                (await getFileBase(eventLink)) + '/AudioLocales/en_US/' + value + '.ogg',
+                path.join(
+                    ExportDir,
+                    'lol',
+                    eventName,
+                    subPath.split('?')[0] || subPath,
+                    'Assets',
+                    'Audio'
+                )
+            );
+        } catch {
+            /* empty */
+        } finally {
+            try {
+                const cdragonLocales = await fetchCdragonLocales();
+                const locales = Object.keys(cdragonLocales);
+
+                const localedl: Promise<Buffer | null>[] = [];
+                for (const locale of locales) {
+                    localedl.push(
+                        download(
+                            (await getFileBase(eventLink)) +
+                                replaceLocalePlaceholder(
+                                    '/AudioLocales/{locale}/{locale}_',
+                                    locale
+                                ) +
+                                value +
+                                '.ogg',
+                            path.join(
+                                ExportDir,
+                                'lol',
+                                eventName,
+                                subPath.split('?')[0] || subPath,
+                                'Assets',
+                                'Audio'
+                            )
+                        )
+                    );
+                }
+
+                await Promise.allSettled(localedl);
+            } catch {
+                // empty
+            }
+        }
     }
 }
 
@@ -275,6 +332,7 @@ export async function finalSweep(eventName: string, eventSubpath: string, eventL
 
     const filesToDl: Promise<Buffer | null>[] = [];
     const vodl: Promise<any>[] = [];
+    const monoDl: Promise<any>[] = [];
 
     for await (const file of jsonFiles) {
         if (file.includes('RiotAudioLoader')) {
@@ -283,61 +341,112 @@ export async function finalSweep(eventName: string, eventSubpath: string, eventL
 
         const raw = await fs.readFile(file, 'utf8');
 
-        if (raw.includes('SFX_')) {
-            const values: any[] = getAllValues(JSON.parse(raw));
+        if (
+            (raw.includes('"panelSfx"') || raw.includes('"audioEvents"')) &&
+            raw.includes('"clipName"')
+        ) {
+            try {
+                const values = JSON.parse(raw);
 
-            for (const value of values) {
-                if (typeof value !== 'string') {
-                    continue;
-                }
+                const pClipName = values.panelSfx.clipName;
+                const pAudioEvents = values.audioEvents;
 
-                if (!value.toLowerCase().includes('sfx')) {
-                    continue;
-                }
+                const fileb = (await getFileBase(eventLink)).split('/');
 
-                try {
-                    decodeURI((await getFileBase(eventLink)) + '/SoundFX/' + value + '.ogg');
-                } catch {
-                    /* empty */
-                    continue;
-                }
+                fileb.splice(-2);
 
-                try {
-                    filesToDl.push(
-                        download(
-                            (await getFileBase(eventLink)) + '/SoundFX/' + value + '.ogg',
-                            path.join(
-                                ExportDir,
-                                'lol',
-                                eventName,
-                                eventSubpath.split('?')[0] || eventSubpath,
-                                'Assets',
-                                'Audio'
-                            )
+                const filebase = fileb.join('/');
+
+                monoDl.push(
+                    download(
+                        filebase +
+                            '/Comic/WebGLBuild/StreamingAssets/SoundFX/' +
+                            pClipName +
+                            '.ogg',
+                        path.join(
+                            ExportDir,
+                            'lol',
+                            eventName,
+                            eventSubpath.split('?')[0] || eventSubpath,
+                            'Assets',
+                            'Audio'
                         )
-                    );
-                } catch {
-                    // empty
+                    )
+                );
+
+                for (const event of pAudioEvents) {
+                    monoDl.push(downloadAllVO(eventName, eventSubpath, eventLink, event.clipName));
                 }
+            } catch {
+                // empty
+            }
+        }
+
+        if (raw.includes('SFX_')) {
+            try {
+                const values: any[] = getAllValues(JSON.parse(raw));
+
+                for (const value of values) {
+                    if (typeof value !== 'string') {
+                        continue;
+                    }
+
+                    if (!value.toLowerCase().includes('sfx')) {
+                        continue;
+                    }
+
+                    try {
+                        decodeURI((await getFileBase(eventLink)) + '/SoundFX/' + value + '.ogg');
+                    } catch {
+                        /* empty */
+                        continue;
+                    }
+
+                    try {
+                        filesToDl.push(
+                            download(
+                                (await getFileBase(eventLink)) + '/SoundFX/' + value + '.ogg',
+                                path.join(
+                                    ExportDir,
+                                    'lol',
+                                    eventName,
+                                    eventSubpath.split('?')[0] || eventSubpath,
+                                    'Assets',
+                                    'Audio'
+                                )
+                            )
+                        );
+                    } catch {
+                        // empty
+                    }
+                }
+            } catch {
+                // empty
             }
         }
 
         if (raw.includes('VO_')) {
-            const values: any[] = getAllValues(JSON.parse(raw));
+            try {
+                const values: any[] = getAllValues(JSON.parse(raw));
 
-            for (const value of values) {
-                if (typeof value !== 'string') {
-                    continue;
+                for (const value of values) {
+                    if (typeof value !== 'string') {
+                        continue;
+                    }
+
+                    if (!value.toLowerCase().includes('vo')) {
+                        continue;
+                    }
+
+                    vodl.push(downloadAllVO(eventName, eventSubpath, eventLink, value));
                 }
-
-                if (!value.toLowerCase().includes('vo')) {
-                    continue;
-                }
-
-                vodl.push(downloadAllVO(eventName, eventSubpath, eventLink, value));
+            } catch {
+                // empty
             }
         }
     }
+
+    await Promise.allSettled(monoDl);
     await Promise.allSettled(vodl);
     await Promise.allSettled(filesToDl);
 }
