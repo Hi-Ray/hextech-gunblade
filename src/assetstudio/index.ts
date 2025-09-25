@@ -31,7 +31,7 @@ function getASOS() {
 
 export async function downloadAS() {
     await download(
-        `https://github.com/aelurum/AssetStudio/releases/download/v0.18.0/AssetStudioModCLI_net6_${getASOS()}.zip`,
+        `https://github.com/aelurum/AssetStudio/releases/download/v0.19.0/AssetStudioModCLI_net9_${getASOS()}.zip`,
         ASDir
     );
 }
