@@ -35,7 +35,7 @@ export async function useAddressableTools(binFile: string) {
     logger.info('Using AddressableTools');
     const exe = os.platform() === 'win32' ? '.exe' : '';
 
-    const proc = Bun.spawn([path.join(toolsLocation, `example${exe}`), 'searchasset', binFile], {
+    const proc = Bun.spawn([path.join(toolsLocation, `Example${exe}`), 'searchasset', binFile], {
         stdin: 'pipe',
         stdout: 'pipe',
         stderr: 'pipe',
@@ -68,6 +68,9 @@ export async function useAddressableTools(binFile: string) {
         stdoutPromise,
         stderrPromise,
     ]);
+
+    logger.info('Exiting addressableTools');
+    logger.info(stderr);
 
     logger.info(`Process exited with code ${exitCode}`);
 

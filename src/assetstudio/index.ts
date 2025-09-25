@@ -37,11 +37,14 @@ export async function downloadAS() {
 }
 
 export async function unzipAS() {
-    const filename = `AssetStudioModCLI_net6_${getASOS()}.zip`;
+    const filename = `AssetStudioModCLI_net9_${getASOS()}.zip`;
 
     await extract(path.join(ASDir, filename), { dir: ASDir });
     if (os.platform() !== 'win32') {
-        await fs.chmod(path.join(ASDir, 'AssetStudioModCLI'), 0o755);
+        await fs.chmod(
+            path.join(ASDir, `AssetStudioModCLI_net9_${getASOS()}`, 'AssetStudioModCLI'),
+            0o755
+        );
     }
 }
 
@@ -52,7 +55,7 @@ export async function useAssetStudioWin(
 ) {
     const proc = Bun.spawn(
         [
-            path.join(ASDir, 'AssetStudioModCLI.exe'),
+            path.join(ASDir, `AssetStudioModCLI_net9_${getASOS()}`, 'AssetStudioModCLI.exe'),
             bundleFolder,
             '-o',
             path.join(ExportDir, 'lol', eventName, subEvent || ''),
@@ -77,7 +80,7 @@ export async function useAssetStudioMacLin(
 ) {
     const proc = Bun.spawn(
         [
-            path.join(ASDir, 'AssetStudioModCLI'),
+            path.join(ASDir, `AssetStudioModCLI_net9_${getASOS()}`, 'AssetStudioModCLI'),
             bundleFolder,
             '-o',
             path.join(ExportDir, 'lol', eventName, subEvent || ''),
