@@ -14,7 +14,7 @@ RUN wget https://packages.microsoft.com/config/debian/11/packages-microsoft-prod
     && rm packages-microsoft-prod.deb
 
 
-RUN apt-get update && apt-get install -y dotnet-runtime-6.0
+RUN apt-get update && apt-get install -y dotnet-runtime-9.0 && apt-get install -y dotnet-runtime-8.0
 
 
 WORKDIR /hextech-gunblade
