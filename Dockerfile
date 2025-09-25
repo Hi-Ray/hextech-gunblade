@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM oven/bun:debian
+FROM oven/bun:1.2.22-debian
 
 RUN apt-get update && apt-get install -y \
     wget \
@@ -9,12 +9,12 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-RUN wget https://packages.microsoft.com/config/debian/11/packages-microsoft-prod.deb -O packages-microsoft-prod.deb \
+RUN wget wget https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -O packages-microsoft-prod.deb \
     && dpkg -i packages-microsoft-prod.deb \
     && rm packages-microsoft-prod.deb
 
 
-RUN apt-get update && apt-get install -y dotnet-runtime-9.0 && apt-get install -y dotnet-runtime-8.0
+RUN apt-get update && apt-get install -y aspnetcore-runtime-9.0 aspnetcore-runtime-8.0
 
 
 WORKDIR /hextech-gunblade
