@@ -55,7 +55,10 @@ export async function getFileBase(url: string) {
 }
 
 export async function getCatalog(url: string) {
-    logger.debug(`Fetching catalog for ${url}`);
+    if (url.startsWith('https://raw.communitydragon.org') || url.startsWith('/')) {
+        return url;
+    }
+
     const res = await axios.get(url);
 
     const data = res.data;
@@ -100,7 +103,12 @@ export async function downloadBinBundles(url: string, eventName: string, subPath
 
     const catalogUrl = await getCatalog(url);
 
-    download(catalogUrl, binFileLocation);
+    logger.fav(`catalogUrl dlbinbundles: ${catalogUrl}`);
+
+    if (catalogUrl.includes('cdragon-bin')) {
+    } else {
+        download(catalogUrl, binFileLocation);
+    }
 
     await getAddressableTools();
     await unzipAddressableTools();
@@ -146,6 +154,8 @@ export async function downloadBinBundles(url: string, eventName: string, subPath
 export async function downloadJsonBundles(url: string, eventName: string, subPath: string) {
     const catalogUrl = await getCatalog(url);
 
+    logger.fav(`catalogUrl dljsonbundles: ${catalogUrl}`);
+
     const assetBasePath = catalogUrl
         .split('/')
         .splice(0, catalogUrl.split('/').length - 1)
@@ -184,6 +194,12 @@ export async function downloadJsonBundles(url: string, eventName: string, subPat
 
 export async function downloadBundles(url: string, eventName: string, subPath: string) {
     const catalogUrl = await getCatalog(url);
+
+    if (catalogUrl.startsWith('/fe/')) {
+        logger.warn(`Fetching from raw`);
+
+        return;
+    }
 
     if (catalogUrl.includes('bin')) {
         logger.info('catalog.bin found, downloading bundles with addrtool');

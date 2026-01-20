@@ -9,8 +9,8 @@ export interface LolData {
     createdAt: string;
     updatedAt: string;
     products: any[];
-    background?: Background;
-    icon?: Icon;
+    background: Background;
+    icon: Icon;
     action: Action;
     endsAt?: string;
 }
@@ -20,7 +20,6 @@ export interface Background {
     type: string;
     dimensions: Dimensions;
     url: string;
-    colors: Colors;
     mimeType: string;
 }
 
@@ -30,18 +29,11 @@ export interface Dimensions {
     aspectRatio: number;
 }
 
-export interface Colors {
-    primary: string;
-    secondary: string;
-    label: string;
-}
-
 export interface Icon {
     provider: string;
     type: string;
     dimensions: Dimensions2;
     url: string;
-    colors?: Colors2;
     mimeType: string;
 }
 
@@ -51,18 +43,13 @@ export interface Dimensions2 {
     aspectRatio: number;
 }
 
-export interface Colors2 {
-    primary: string;
-    secondary: string;
-    label: string;
-}
-
 export interface Action {
     type: string;
     payload: Payload;
 }
 
 export interface Payload {
-    tabId?: string;
+    metagameId?: string;
     url?: string;
+    tabId?: string;
 }

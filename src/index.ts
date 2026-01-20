@@ -2,15 +2,20 @@ import { version } from '../package.json';
 
 import logger from 'signale';
 import * as process from 'process';
-import { checkEnvironment, sync } from '~/sync.ts';
+import fs from 'fs';
+
+import { downloadBundles } from '@stormrazor/getter.ts';
 
 import { downloadAudio, extractAudioList, finalSweep, startMiniGameExtractor } from '~/assetstudio';
-import { downloadBundles } from '@stormrazor/getter.ts';
 import { getLolEvents } from '~/scraper.ts';
+import { checkEnvironment, sync } from '~/sync.ts';
+
+import downloadDirectory from '@utils/cddd.ts';
+import { copyRecursive } from '@utils/file.ts';
 
 import path from 'path';
 
-import { ExportDir } from '~/dirs.ts';
+import { ExportDir, TempDir } from '~/dirs.ts';
 
 // Date for the license notice
 export const currentYear = new Date().getFullYear();
@@ -53,64 +58,94 @@ const events = await getLolEvents();
 const bundles: Promise<void>[] = [];
 
 for await (const event of events) {
-    bundles.push(downloadBundles(event.link, event.eventName, event.subPath));
-}
+    if (event.link.startsWith('/fe/')) {
+        logger.warn(`Downloading event from raw`);
+        const saveLocation = path.join(
+            TempDir,
+            event.subPath,
+            event.eventName.split('?')[0] || event.eventName
+        );
 
-const bundlesResult = await Promise.allSettled(bundles);
+        await downloadDirectory(
+            `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-navigation/global/default/${event.eventName}/`,
+            saveLocation
+        );
 
-bundlesResult.forEach((bundle, i) => {
-    if (bundle.status === 'fulfilled') {
-        logger.info(`Downloaded bundle for ${events[i]?.eventName}`);
-    }
-});
+        await startMiniGameExtractor();
 
-logger.warn('Starting minigame extractor');
-try {
-    await startMiniGameExtractor();
-} catch (e) {
-    logger.warn('no events found');
-    logger.error((e as any).message);
-    process.exit(0);
-}
+        const audioDir = path.join(
+            ExportDir,
+            'lol',
+            event.subPath,
+            event.eventName,
+            'Assets',
+            'Audio'
+        );
+        await copyRecursive(path.join(saveLocation, 'streamingassets'), audioDir, 'aa');
 
-const audioDownload: Promise<void>[] = [];
-const final: Promise<void>[] = [];
-
-for await (const event of events) {
-    const subPath = event.subPath.split('?')[0] || event.subPath;
-    logger.info(
-        `Fetching RiotAudioLoader ${path.join('events', 'lol', event.eventName)};${subPath}`
-    );
-    const list = await extractAudioList(
-        path.join(ExportDir, 'lol', event.eventName),
-        subPath,
-        event.link
-    );
-
-    if (!list) {
-        logger.warn(`No event sounds found for ${event.eventName}`);
         continue;
     }
 
-    audioDownload.push(downloadAudio(list));
+    for await (const event of events) {
+        bundles.push(downloadBundles(event.link, event.eventName, event.subPath));
+    }
 
-    final.push(finalSweep(event.eventName, event.subPath, event.link));
+    const bundlesResult = await Promise.allSettled(bundles);
+
+    bundlesResult.forEach((bundle, i) => {
+        if (bundle.status === 'fulfilled') {
+            logger.info(`Downloaded bundle for ${events[i]?.eventName}`);
+        }
+    });
+
+    logger.warn('Starting minigame extractor');
+    try {
+        await startMiniGameExtractor();
+    } catch (e) {
+        logger.warn('no events found');
+        logger.error((e as any).message);
+        process.exit(0);
+    }
+
+    const audioDownload: Promise<void>[] = [];
+    const final: Promise<void>[] = [];
+
+    for await (const event of events) {
+        const subPath = event.subPath.split('?')[0] || event.subPath;
+        logger.info(
+            `Fetching RiotAudioLoader ${path.join('events', 'lol', event.eventName)};${subPath}`
+        );
+        const list = await extractAudioList(
+            path.join(ExportDir, 'lol', event.eventName),
+            subPath,
+            event.link
+        );
+
+        if (!list) {
+            logger.warn(`No event sounds found for ${event.eventName}`);
+            continue;
+        }
+
+        audioDownload.push(downloadAudio(list));
+
+        final.push(finalSweep(event.eventName, event.subPath, event.link));
+    }
+
+    const adP = await Promise.allSettled(audioDownload);
+    const finalP = await Promise.allSettled(final);
+
+    adP.forEach((audio, i) => {
+        if (audio.status === 'fulfilled') {
+            logger.info(`Audio Downloaded`);
+        }
+    });
+
+    finalP.forEach((final, i) => {
+        if (final.status === 'fulfilled') {
+            logger.info(`Completed ${i + 1} of ${finalP.length}`);
+        }
+    });
 }
-
-const adP = await Promise.allSettled(audioDownload);
-const finalP = await Promise.allSettled(final);
-
-adP.forEach((audio, i) => {
-    if (audio.status === 'fulfilled') {
-        logger.info(`Audio Downloaded`);
-    }
-});
-
-finalP.forEach((final, i) => {
-    if (final.status === 'fulfilled') {
-        logger.info(`Completed ${i + 1} of ${finalP.length}`);
-    }
-});
 
 if (ftp) {
     await sync();

@@ -2,6 +2,8 @@ import _download from 'download';
 import path from 'path';
 import fs from 'fs/promises';
 
+import logger from 'signale';
+
 export async function download(url: string, dest: string, opts: any = {}): Promise<Buffer | null> {
     try {
         const buf: Buffer = await _download(url, { throwHttpErrors: false, ...opts });
@@ -11,11 +13,15 @@ export async function download(url: string, dest: string, opts: any = {}): Promi
             return null;
         }
 
-        await fs.mkdir(dest, { recursive: true });
+        try {
+            await fs.mkdir(dest, { recursive: true });
 
-        const filename = path.basename(new URL(url).pathname);
-        const filepath = path.join(dest, filename);
-        await fs.writeFile(filepath, buf);
+            const filename = path.basename(new URL(url).pathname);
+            const filepath = path.join(dest, filename);
+            await fs.writeFile(filepath, buf);
+        } catch {
+            logger.fatal(url);
+        }
 
         return buf;
     } catch {

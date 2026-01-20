@@ -1,4 +1,3 @@
-import logger from 'signale';
 import axios from 'axios';
 
 import { replaceEventPlaceholder, replaceLocalePlaceholder } from '@utils/string.ts';
@@ -108,7 +107,11 @@ export async function extractLolEvents(): Promise<string[]> {
     const data = [];
 
     for (const homepage of homepages.lol) {
-        if (homepage.action.payload.tabId) {
+        if (homepage.action.type === 'lc_open_metagame') {
+            data.push(homepage.action.payload.url);
+        }
+
+        if (homepage.action.payload.tabId && homepage.action.type !== 'lc_home_tab') {
             const location = homepage.action.payload.tabId;
 
             data.push(location);
@@ -118,12 +121,35 @@ export async function extractLolEvents(): Promise<string[]> {
     return data;
 }
 
-export async function getLolEvents() {
-    const eventNames = await extractLolEvents();
+export async function getLCUEmbeddedMetagames(): Promise<ScraperData[]> {
+    const events = [];
 
+    const homePages: LolData[] = await getLolHomepages();
+
+    for (const page of homePages) {
+        if (page.action.type === 'lc_open_metagame') {
+            if (page.action.payload.url?.endsWith('/index.html')) {
+                events.push({
+                    eventName: page.action.payload.url.split('/').filter(Boolean).at(-2) ?? '',
+                    link: page.action.payload.url,
+                    isMinigame: true,
+                    subPath: page.action.payload.metagameId || '',
+                });
+            }
+        }
+    }
+
+    return events;
+}
+
+export async function getExternallyHostedMetagames(eventNames: string[]): Promise<ScraperData[]> {
     const events: ScraperData[] = [];
 
     for (const eventName of eventNames) {
+        if (eventName.startsWith('/')) {
+            continue;
+        }
+
         const event = replaceLocalePlaceholder(
             replaceEventPlaceholder(eventUrls.lol, eventName),
             'en_GB'
@@ -154,8 +180,18 @@ export async function getLolEvents() {
                 }
             }
         } catch {
-            logger.warn(`Could not fetch event: ${eventName}`);
+            //logger.warn(`Could not fetch event: ${eventName}`);
         }
     }
+
     return events;
+}
+
+export async function getLolEvents() {
+    const eventNames = await extractLolEvents();
+
+    const lcu = await getLCUEmbeddedMetagames();
+    const exter = await getExternallyHostedMetagames(eventNames);
+
+    return [...exter, ...lcu];
 }
