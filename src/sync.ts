@@ -10,6 +10,16 @@ import { ExportDir } from '~/dirs.ts';
 const currentYear = new Date().getFullYear();
 const currentMonth = ('0' + (new Date().getMonth() + 1)).slice(-2);
 
+const config = {
+    username: process.env.FTP_USERNAME,
+    password: process.env.FTP_PASSWORD,
+    port: parseInt(process.env.FTP_PORT || '22'),
+    host: process.env.FTP_URL,
+    keepaliveInterval: 10000,
+    keepaliveCountMax: 10,
+    readyTimeout: 40000,
+};
+
 /**
  * Check that the important environment variables aren't empty/null.
  *
@@ -74,134 +84,71 @@ const getFileList = async (dirName: string): Promise<string[]> => {
 };
 
 /**
- * Directory exists cache.
- */
-const existsCache: string[] = [];
-
-/**
  * Sync the data with the FTP share.
  *
  * @async
  */
 export const sync = async () => {
     checkEnvironment(true);
-
     const client = new sftp('infinityedge');
 
-    await client.connect({
-        username: process.env.FTP_USERNAME,
-        password: process.env.FTP_PASSWORD,
-        port: 22,
-        host: process.env.FTP_URL,
-    });
+    const ensureConnection = async () => {
+        try {
+            await client.realPath('.');
+        } catch {
+            logger.warn('SFTP connection lost, attempting to reconnect...');
+            await client.connect(config);
+        }
+    };
 
-    client.on('error', (err) => {
-        logger.error('SFTP Client Error Event:', err.message);
-    });
+    await client.connect(config);
 
-    client.on('close', () => {
-        logger.warn('SFTP Connection Closed');
-    });
+    client.on('error', (err) => logger.error('SFTP Error:', err.message));
+    client.on('close', () => logger.warn('SFTP Connection Closed.'));
 
-    if (!(await client.exists('/data'))) {
-        logger.error('Could not find the data directory.');
-        process.exit(1);
-    }
+    try {
+        await ensureConnection();
 
-    if (!(await client.exists(`/data/${currentYear}`))) {
-        await client.mkdir(`/data/${currentYear}`);
-    }
+        if (!(await client.exists('/data'))) {
+            logger.error('Data directory missing on server.');
+            process.exit(1);
+        }
 
-    const folders = await getDirectories(ExportDir);
+        const folders = await getDirectories(ExportDir);
 
-    existsCache.push(ExportDir);
-
-    existsCache.push(`events/${currentYear}`);
-
-    for (const event of folders) {
-        if (!(await client.exists(`data/${currentYear}/${event}`))) {
+        for (const event of folders) {
             const files = await getFileList(`events/${event}`);
 
             for (const file of files) {
-                if (file.startsWith('riot-client')) {
-                    if (
-                        await client.exists(
-                            `data/riot-client/${currentYear}/${currentMonth}/${
-                                file.match(/\//g)?.length === 1
-                                    ? file
-                                    : file.replace('riot-client/', '')
-                            }`
-                        )
-                    ) {
-                        logger.info('file exists skipping');
-                        continue;
+                const remotePath = file.startsWith('riot-client') ? '...' : '...';
+
+                const performUpload = async () => {
+                    await ensureConnection();
+
+                    if (await client.exists(remotePath)) {
+                        return logger.info(`Skipping ${file} (Exists)`);
                     }
 
-                    if (
-                        !(await client.exists(
-                            path.dirname(
-                                `data/riot-client/${currentYear}/${currentMonth}/${
-                                    file.match(/\//g)?.length === 1
-                                        ? file
-                                        : file.replace('riot-client/', '')
-                                }`
-                            )
-                        ))
-                    ) {
-                        await client.mkdir(
-                            path.dirname(
-                                `data/riot-client/${currentYear}/${currentMonth}/${
-                                    file.match(/\//g)?.length === 1
-                                        ? file
-                                        : file.replace('riot-client/', '')
-                                }`
-                            ),
-                            true
-                        );
-                    }
-                    await client.put(
-                        `events/${file}`,
-                        `data/riot-client/${currentYear}/${currentMonth}/${
-                            file.match(/\//g)?.length == 1 ? file : file.replace('riot-client/', '')
-                        }`
-                    );
-                } else {
-                    if (
-                        await client.exists(
-                            `data/${currentYear}/${file.replace('lol/', '').replace('tft/', '')}`
-                        )
-                    ) {
-                        logger.info('file exists skipping');
-                        continue;
+                    const remoteDir = path.dirname(remotePath);
+                    if (!(await client.exists(remoteDir))) {
+                        await client.mkdir(remoteDir, true);
                     }
 
-                    logger.info(
-                        'Transferring file ' +
-                            `data/${currentYear}/${file.replace('lol/', '').replace('tft/', '')}`
-                    );
+                    logger.info(`Uploading: ${file}`);
+                    await client.put(`events/${file}`, remotePath);
+                };
 
-                    if (
-                        !(await client.exists(
-                            path.dirname(
-                                `data/${currentYear}/${file.replace('lol/', '').replace('tft/', '')}`
-                            )
-                        ))
-                    ) {
-                        await client.mkdir(
-                            path.dirname(
-                                `data/${currentYear}/${file.replace('lol/', '').replace('tft/', '')}`
-                            ),
-                            true
-                        );
-                    }
-
-                    await client.put(
-                        `events/${file}`,
-                        `data/${currentYear}/${file.replace('lol/', '').replace('tft/', '')}`
-                    );
+                try {
+                    await performUpload();
+                } catch {
+                    logger.error(`Upload failed for ${file}, retrying once...`);
+                    await performUpload();
                 }
             }
         }
+    } catch (err: any) {
+        logger.fatal('Sync process interrupted:', err.message);
+    } finally {
+        await client.end();
     }
-    await client.end();
 };
