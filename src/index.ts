@@ -16,6 +16,14 @@ import path from 'path';
 
 import { ExportDir, TempDir } from '~/dirs.ts';
 
+process.on('unhandledRejection', (reason, promise) => {
+    logger.debug('💥 Unhandled rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    logger.error('💥 Uncaught Exception:', err.message);
+});
+
 // Date for the license notice
 export const currentYear = new Date().getFullYear();
 
