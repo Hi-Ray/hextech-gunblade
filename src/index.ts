@@ -51,10 +51,6 @@ logger.info('Checking environment variables');
 // Check FTP Environmental Variables
 const ftp = checkEnvironment();
 
-if (ftp) {
-    await sync();
-}
-
 logger.warn('Getting lol events');
 const events = await getLolEvents();
 
