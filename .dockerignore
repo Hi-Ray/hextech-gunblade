@@ -4,3 +4,5 @@ assets-studio/
 .idea/
 .woodpecker/
 README.md
+node_modules/
+.git/

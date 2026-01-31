@@ -4,7 +4,7 @@ name: hextech-gunblade
 
 steps:
   - name: Run Program
-    image: oven/bun:1.2.22-debian
+    image: oven/bun:1-debian
     environment:
       FTP_URL:
         from_secret: FTP_URL
@@ -14,7 +14,7 @@ steps:
         from_secret: FTP_PASSWORD
       NODE_ENV: production
     commands:
-      - apt-get update && apt-get install -y wget apt-transport-https software-properties-common gnupg ca-certificates && rm -rf /var/lib/apt/lists/*
+      - apt-get update && apt-get install -y wget apt-transport-https gnupg ca-certificates && rm -rf /var/lib/apt/lists/*
       - wget https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -O packages-microsoft-prod.deb && dpkg -i packages-microsoft-prod.deb && rm packages-microsoft-prod.deb
       - apt-get update && apt-get install -y dotnet-runtime-9.0 dotnet-runtime-8.0
       - bun install

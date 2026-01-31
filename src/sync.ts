@@ -95,6 +95,14 @@ export const sync = async () => {
         host: process.env.FTP_URL,
     });
 
+    client.on('error', (err) => {
+        logger.error('SFTP Client Error Event:', err.message);
+    });
+
+    client.on('close', () => {
+        logger.warn('SFTP Connection Closed');
+    });
+
     if (!(await client.exists('/data'))) {
         logger.error('Could not find the data directory.');
         process.exit(1);

@@ -4,12 +4,11 @@ FROM oven/bun:1-debian
 RUN apt-get update && apt-get install -y \
     wget \
     apt-transport-https \
-    software-properties-common \
     gnupg \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-RUN wget wget https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -O packages-microsoft-prod.deb \
+RUN wget https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -O packages-microsoft-prod.deb \
     && dpkg -i packages-microsoft-prod.deb \
     && rm packages-microsoft-prod.deb
 
