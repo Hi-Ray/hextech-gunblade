@@ -1,5 +1,4 @@
 import { TempDir } from '../dirs.ts';
-
 import path from 'path';
 import os from 'os';
 import download from 'download';
@@ -41,60 +40,27 @@ export async function useAddressableTools(binFile: string) {
         stderr: 'pipe',
     });
 
-    // Simulate pressing Enter
     proc.stdin.write('\n');
     proc.stdin.end();
 
-    const stdoutPromise = (async () => {
-        let out = '';
-        const decoder = new TextDecoder();
-        for await (const chunk of proc.stdout) {
-            out += decoder.decode(chunk);
-        }
-        return out;
-    })();
-
-    const stderrPromise = (async () => {
-        let err = '';
-        const decoder = new TextDecoder();
-        for await (const chunk of proc.stderr) {
-            err += decoder.decode(chunk);
-        }
-        return err;
-    })();
-
-    const [exitCode, stdout, stderr] = await Promise.all([
-        proc.exited,
-        stdoutPromise,
-        stderrPromise,
-    ]);
+    const stdout = await new Response(proc.stdout).text();
+    const stderr = await new Response(proc.stderr).text();
+    const exitCode = await proc.exited;
 
     logger.info('Exiting addressableTools');
-    logger.info(stderr);
+    if (stderr.trim()) {
+        logger.warn(`Tool Stderr: ${stderr.trim()}`);
+    }
 
     logger.info(`Process exited with code ${exitCode}`);
 
     return stdout;
 }
+
 export async function getBinBundles(binData: string) {
-    return [
-        ...new Set(
-            binData
-                .split('\n')
-                .filter((line) =>
-                    line.match(
-                        /\{UnityEngine\.AddressableAssets\.Addressables\.RuntimePath\}.*\.bundle/gimu
-                    )
-                )
-                .map(
-                    (line) =>
-                        line
-                            .replaceAll('\r', '')
-                            .match(
-                                /\{UnityEngine\.AddressableAssets\.Addressables\.RuntimePath\}.*\.bundle/gimu
-                            )?.[0] ?? ''
-                )
-                .filter((line) => line !== '')
-        ),
-    ];
+    const regex = /\{UnityEngine\.AddressableAssets\.Addressables\.RuntimePath\}.*?\.bundle/gimu;
+    const matches = binData.match(regex) || [];
+
+    // Clean and return unique results
+    return [...new Set(matches.map((m) => m.replace(/\r/g, '')))];
 }
