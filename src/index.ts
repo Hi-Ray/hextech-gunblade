@@ -2,7 +2,6 @@ import { version } from '../package.json';
 
 import logger from 'signale';
 import * as process from 'process';
-import fs from 'fs';
 
 import { downloadBundles } from '@stormrazor/getter.ts';
 
@@ -19,14 +18,6 @@ import { ExportDir, TempDir } from '~/dirs.ts';
 
 // Date for the license notice
 export const currentYear = new Date().getFullYear();
-
-process.on('unhandledRejection', (reason, promise) => {
-    logger.debug('💥 Unhandled rejection:', reason);
-});
-
-process.on('uncaughtException', (err) => {
-    logger.error('💥 Uncaught Exception:', err.message);
-});
 
 // License notice
 console.log(
@@ -112,9 +103,7 @@ for await (const event of events) {
 
     for await (const event of events) {
         const subPath = event.subPath.split('?')[0] || event.subPath;
-        logger.info(
-            `Fetching RiotAudioLoader ${path.join('events', 'lol', event.eventName)};${subPath}`
-        );
+        logger.info(`Fetching audio for ${path.join('events', 'lol', event.eventName)};${subPath}`);
         const list = await extractAudioList(
             path.join(ExportDir, 'lol', event.eventName),
             subPath,

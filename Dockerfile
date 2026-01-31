@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM oven/bun:1.2.22-debian
+FROM oven/bun:1-debian
 
 RUN apt-get update && apt-get install -y \
     wget \

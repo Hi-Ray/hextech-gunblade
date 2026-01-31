@@ -12,10 +12,11 @@ import {
     unzipAddressableTools,
     useAddressableTools,
 } from '~/addressabletools';
+import consts from '~/consts.ts';
 
 const cache = new Map<string, string>();
 
-export async function getFileBase(url: string) {
+export async function getFileBase(url: string, path?: string): Promise<string> {
     try {
         let data;
 
@@ -44,7 +45,11 @@ export async function getFileBase(url: string) {
                     .splice(0, src.split('/').length - 4)
                     .join('/');
 
-                filebase = cleanUrl + '/WebGLBuild/StreamingAssets';
+                if (path) {
+                    filebase = cleanUrl + `/${path}/WebGLBuild/StreamingAssets`;
+                } else {
+                    filebase = cleanUrl + '/WebGLBuild/StreamingAssets';
+                }
             }
         });
         return filebase;
@@ -62,7 +67,6 @@ export async function getCatalog(url: string) {
     const res = await axios.get(url);
 
     const data = res.data;
-
     const $ = cheerio.load(data);
 
     let catalogUrl = '';
@@ -86,14 +90,30 @@ export async function getCatalog(url: string) {
         }
     });
 
-    return axios
-        .get(clean + '/Comic/WebGLBuild/StreamingAssets/aa/catalog.bin')
-        .then(() => {
-            return clean + '/Comic/WebGLBuild/StreamingAssets/aa/catalog.bin';
-        })
-        .catch(() => {
-            return catalogUrl;
-        });
+    try {
+        const cata = await axios.get(catalogUrl);
+
+        if (cata.status === 200) return catalogUrl;
+    } catch {
+        const catalogBinTemplate = clean + '/{{url}}/WebGLBuild/StreamingAssets/aa/catalog.bin';
+
+        for (const cUrl of consts.knownComicUrls) {
+            const potentialBinUrl = catalogBinTemplate.replace('{{url}}', cUrl);
+            try {
+                const comicRes = await axios.get(potentialBinUrl);
+
+                if (comicRes.status === 200) {
+                    return catalogBinTemplate.replace('{{url}}', cUrl);
+                }
+            } catch {
+                //
+            }
+        }
+
+        return catalogUrl;
+    }
+
+    throw new Error(`Unable to get catalog URL for ${url}`);
 }
 
 export async function downloadBinBundles(url: string, eventName: string, subPath: string) {
@@ -103,11 +123,13 @@ export async function downloadBinBundles(url: string, eventName: string, subPath
 
     const catalogUrl = await getCatalog(url);
 
-    logger.fav(`catalogUrl dlbinbundles: ${catalogUrl}`);
-
-    if (catalogUrl.includes('cdragon-bin')) {
+    if (catalogUrl?.includes('cdragon-bin')) {
     } else {
-        download(catalogUrl, binFileLocation);
+        if (catalogUrl) {
+            download(catalogUrl, binFileLocation);
+        } else {
+            throw new Error(`No catalog URL found for ${url}`);
+        }
     }
 
     await getAddressableTools();
@@ -154,8 +176,6 @@ export async function downloadBinBundles(url: string, eventName: string, subPath
 export async function downloadJsonBundles(url: string, eventName: string, subPath: string) {
     const catalogUrl = await getCatalog(url);
 
-    logger.fav(`catalogUrl dljsonbundles: ${catalogUrl}`);
-
     const assetBasePath = catalogUrl
         .split('/')
         .splice(0, catalogUrl.split('/').length - 1)
@@ -195,17 +215,16 @@ export async function downloadJsonBundles(url: string, eventName: string, subPat
 export async function downloadBundles(url: string, eventName: string, subPath: string) {
     const catalogUrl = await getCatalog(url);
 
-    if (catalogUrl.startsWith('/fe/')) {
+    if (catalogUrl?.startsWith('/fe/')) {
         logger.warn(`Fetching from raw`);
-
         return;
     }
 
-    if (catalogUrl.includes('bin')) {
-        logger.info('catalog.bin found, downloading bundles with addrtool');
+    if (catalogUrl?.includes('bin')) {
         await downloadBinBundles(url, eventName, subPath);
-    } else {
-        logger.info('catalog.json found, downloading bundles without addrtool');
+    } else if (catalogUrl?.includes('json')) {
         await downloadJsonBundles(url, eventName, subPath);
+    } else {
+        logger.warn(`unable to download bundles for ${subPath}/${eventName}`);
     }
 }

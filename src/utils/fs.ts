@@ -13,13 +13,14 @@ export async function findFilesContaining(dir: string, substring: string): Promi
     let results: string[] = [];
     const absDir = path.resolve(dir); // make sure base dir is absolute
     const entries = await fs.readdir(absDir, { withFileTypes: true });
+    substring = substring.toLowerCase();
 
     for (const entry of entries) {
         const fullPath = path.join(absDir, entry.name);
 
         if (entry.isDirectory()) {
             results = results.concat(await findFilesContaining(fullPath, substring));
-        } else if (entry.isFile() && entry.name.includes(substring)) {
+        } else if (entry.isFile() && entry.name.toLowerCase().includes(substring)) {
             results.push(fullPath);
         }
     }

@@ -20,7 +20,32 @@ export interface LolBlade {
     footerLinks?: FooterLink[];
     alignment?: string;
     title?: string;
-    links?: Link[];
+    links?: MotionComicLink[];
+}
+
+export interface MotionComicLink {
+    title: string;
+    display: string;
+    action: MotionComicLinkAction;
+    media: MotionComicMedia;
+}
+
+export interface MotionComicLinkAction {
+    type: string;
+    payload: MotionComicActionPayload;
+}
+
+export interface MotionComicActionPayload {
+    metagameId: string;
+    url: string;
+}
+
+export interface MotionComicMedia {
+    provider: string;
+    type: string;
+    dimensions: Dimensions2;
+    url: string;
+    mimeType: string;
 }
 
 export interface Backdrop {
@@ -71,6 +96,7 @@ export interface Header {
     supertitle: string;
     media: Media;
     description: Description;
+    links: Link[];
 }
 
 export interface Media {

@@ -13,8 +13,10 @@ import type { RiotAudioLoaderRoot } from '@interfaces/riotaudioloader.interface.
 import type { FileList } from '@interfaces/audiolist.interface.ts';
 import { getFileBase } from '@stormrazor/getter.ts';
 import { fetchCdragonLocales } from '@utils/cdragon.ts';
-import { getAllValues } from '@utils/json.ts';
 import { isValidUTF8, replaceLocalePlaceholder } from '@utils/string.ts';
+import { existsSync } from 'node:fs';
+import { flatten } from 'flat';
+import consts from '~/consts';
 
 function getASOS() {
     switch (os.platform()) {
@@ -138,15 +140,25 @@ export async function startMiniGameExtractor() {
 }
 
 export async function extractAudioList(eventName: string, subPath: string, eventLink: string) {
-    const files = await findFilesContaining(path.join(eventName, subPath), 'RiotAudioLoader');
+    if (!existsSync(eventName)) {
+        return [];
+    }
+
+    logger.warn('extracting audio list');
+
+    const files = [];
+    const fileSearchTerms = ['_SFX', '_VO', 'RiotAudioLoader'];
     const fileList: FileList[] = [];
 
+    for (const term of fileSearchTerms) {
+        files.push(
+            ...(await findFilesContaining(path.join(eventName, subPath), term)).filter((file) =>
+                file.endsWith('.json')
+            )
+        );
+    }
+
     for (const file of files) {
-        const res = await fs.readFile(file, 'utf8');
-        const data: RiotAudioLoaderRoot = JSON.parse(res);
-
-        const oggFiles = data._nameList.map((name) => name + '.ogg');
-
         let location;
 
         if (os.platform() === 'win32') {
@@ -165,14 +177,54 @@ export async function extractAudioList(eventName: string, subPath: string, event
             /* empty */
         }
 
-        for (const oggFile of oggFiles) {
-            fileList.push({
-                location: audioLocation,
-                soundFX: (await getFileBase(eventLink)) + '/SoundFX/' + oggFile,
-                VO: (await getFileBase(eventLink)) + '/AudioLocales/en_US/' + oggFile,
-                VO_LOCAL:
-                    (await getFileBase(eventLink)) + '/AudioLocales/{locale}/{locale}_' + oggFile,
-            });
+        const res = await fs.readFile(file, 'utf8');
+
+        if (JSON.parse(res)._nameList) {
+            const data: RiotAudioLoaderRoot = JSON.parse(res);
+            const oggFiles = data._nameList.map((name) => name + '.ogg');
+
+            for (const oggFile of oggFiles) {
+                for (const url of consts.knownComicUrls) {
+                    fileList.push({
+                        location: audioLocation,
+                        soundFX: (await getFileBase(eventLink, url)) + '/SoundFX/' + oggFile,
+                        VO: (await getFileBase(eventLink, url)) + '/AudioLocales/en_US/' + oggFile,
+                        VO_LOCAL:
+                            (await getFileBase(eventLink, url)) + '/{locale}/{locale}_' + oggFile,
+                    });
+                }
+            }
+        } else if (JSON.parse(res).letteringSfx) {
+            const parsed = JSON.parse(res);
+
+            if (parsed.letteringSfx.clipName !== '') {
+                const file = parsed.letteringSfx.clipName + '.ogg';
+                for (const url of consts.knownComicUrls) {
+                    fileList.push({
+                        location: audioLocation,
+                        soundFX: (await getFileBase(eventLink, url)) + '/SoundFX/' + file,
+                        VO: '',
+                        VO_LOCAL: '',
+                    });
+                }
+            }
+        } else if (JSON.parse(res).panelSfx) {
+            const parsed = JSON.parse(res);
+
+            if (parsed.panelSfx.clipName !== '') {
+                const file = parsed.panelSfx.clipName + '.ogg';
+                for (const url of consts.knownComicUrls) {
+                    fileList.push({
+                        location: audioLocation,
+                        soundFX: '',
+                        VO: (await getFileBase(eventLink, url)) + '/AudioLocales/en_US/' + file,
+                        VO_LOCAL:
+                            (await getFileBase(eventLink, url)) +
+                            '/AudioLocales/{locale}/' +
+                            `{locale}_${file}`,
+                    });
+                }
+            }
         }
     }
     return fileList;
@@ -183,12 +235,18 @@ export async function downloadAudio(fileList: FileList[]) {
     const toDL: Promise<Buffer | null>[] = [];
 
     for (const file of fileList) {
-        toDL.push(download(file.soundFX, file.location));
+        if (file.soundFX) {
+            toDL.push(download(file.soundFX, file.location));
+        }
 
-        toDL.push(download(file.VO, file.location));
+        if (file.VO) {
+            toDL.push(download(file.VO, file.location));
+        }
 
-        for (const locale of cdragonLocales) {
-            toDL.push(download(file.VO_LOCAL.replaceAll('{locale}', locale), file.location));
+        if (file.VO_LOCAL) {
+            for (const locale of cdragonLocales) {
+                toDL.push(download(file.VO_LOCAL.replaceAll('{locale}', locale), file.location));
+            }
         }
     }
 
@@ -322,6 +380,27 @@ export async function downloadAllVO(
     }
 }
 
+export async function downloadSFX(
+    eventLink: string,
+    eventName: string,
+    eventSubpath: string,
+    cUrl: string,
+    clipName: string
+) {
+    return download(
+        (await getFileBase(eventLink, cUrl)) + '/SoundFX/' + clipName + '.ogg',
+        path.join(
+            ExportDir,
+            'lol',
+            eventName,
+            eventSubpath.split('?')[0] || eventSubpath,
+            'Assets',
+            'Audio',
+            'SoundFX'
+        )
+    );
+}
+
 export async function finalSweep(eventName: string, eventSubpath: string, eventLink: string) {
     const jsonFiles = await findFilesContaining(
         path.join(ExportDir, 'lol', eventName, eventSubpath.split('?')[0] || ''),
@@ -341,111 +420,138 @@ export async function finalSweep(eventName: string, eventSubpath: string, eventL
 
         const raw = await fs.readFile(file, 'utf8');
 
-        if (
-            (raw.includes('"panelSfx"') || raw.includes('"audioEvents"')) &&
-            raw.includes('"clipName"')
-        ) {
-            try {
-                const values = JSON.parse(raw);
-
-                const pClipName = values.panelSfx.clipName;
-                const pAudioEvents = values.audioEvents;
-
-                const fileb = (await getFileBase(eventLink)).split('/');
-
-                fileb.splice(-2);
-
-                const filebase = fileb.join('/');
-
-                monoDl.push(
-                    download(
-                        filebase +
-                            '/Comic/WebGLBuild/StreamingAssets/SoundFX/' +
-                            pClipName +
-                            '.ogg',
-                        path.join(
-                            ExportDir,
-                            'lol',
-                            eventName,
-                            eventSubpath.split('?')[0] || eventSubpath,
-                            'Assets',
-                            'Audio'
-                        )
-                    )
-                );
-
-                for (const event of pAudioEvents) {
-                    monoDl.push(downloadAllVO(eventName, eventSubpath, eventLink, event.clipName));
-                }
-            } catch {
-                // empty
-            }
-        }
-
-        if (raw.includes('SFX_')) {
-            try {
-                const values: any[] = getAllValues(JSON.parse(raw));
-
-                for (const value of values) {
-                    if (typeof value !== 'string') {
-                        continue;
-                    }
-
-                    if (!value.toLowerCase().includes('sfx')) {
-                        continue;
-                    }
-
-                    try {
-                        decodeURI((await getFileBase(eventLink)) + '/SoundFX/' + value + '.ogg');
-                    } catch {
-                        /* empty */
-                        continue;
-                    }
-
-                    try {
-                        filesToDl.push(
-                            download(
-                                (await getFileBase(eventLink)) + '/SoundFX/' + value + '.ogg',
-                                path.join(
-                                    ExportDir,
-                                    'lol',
+        if (raw.match(/(MU|AMB|SFX|UI|AudioKeys|SfxKey)/gim)) {
+            if (
+                file.toLowerCase().includes('sfx') ||
+                file.toLowerCase().includes('mu') ||
+                file.toLowerCase().includes('amb') ||
+                file.toLowerCase().includes('ui') ||
+                file.toLowerCase().includes('comic')
+            ) {
+                try {
+                    const txt = await fs.readFile(file, 'utf8');
+                    const obj = JSON.parse(txt);
+                    if (obj.panelSfx) {
+                        for (const cUrl of consts.knownComicUrls) {
+                            filesToDl.push(
+                                downloadSFX(
+                                    eventLink,
                                     eventName,
-                                    eventSubpath.split('?')[0] || eventSubpath,
-                                    'Assets',
-                                    'Audio'
+                                    eventSubpath,
+                                    cUrl,
+                                    obj.panelSfx.clipName ?? obj.SfxKey.clipName
                                 )
-                            )
-                        );
+                            );
+                        }
+                    } else if (obj.uiAudioKeys) {
+                        for (const cUrl of consts.knownComicUrls) {
+                            for (const key of obj.uiAudioKeys) {
+                                filesToDl.push(
+                                    downloadSFX(eventLink, eventName, eventSubpath, cUrl, key)
+                                );
+                            }
+                        }
+                    } else if (obj.audioEvents) {
+                        for (const cUrl of consts.knownComicUrls) {
+                            for (const key of obj.audioEvents) {
+                                filesToDl.push(
+                                    downloadSFX(eventLink, eventName, eventSubpath, cUrl, key)
+                                );
+                            }
+                        }
+                    } else {
+                        const flat: any = flatten(obj);
+                        const keys = Object.keys(flat);
+
+                        for (const key of keys) {
+                            if (
+                                typeof flat[key] === 'string' &&
+                                flat[key].trim() !== '' &&
+                                flat[key].match(/_(MU|AMB|SFX|UI|AudioKeys|SfxKey)_/gm)
+                            ) {
+                                for (const cUrl of consts.knownComicUrls) {
+                                    filesToDl.push(
+                                        downloadSFX(
+                                            eventLink,
+                                            eventName,
+                                            eventSubpath,
+                                            cUrl,
+                                            flat[key]
+                                        )
+                                    );
+                                }
+                            }
+                        }
+                    }
+                } catch {
+                    //
+                }
+            } else {
+                if (file.toLowerCase().includes('_vo')) {
+                    try {
+                        const txt = await fs.readFile(file, 'utf8');
+                        const obj = JSON.parse(txt);
+
+                        if (obj.letteringSfx) {
+                            for await (const locale of Object.keys(await fetchCdragonLocales())) {
+                                for await (const cUrl of consts.knownComicUrls) {
+                                    if (
+                                        locale.toLowerCase() === 'en_us' ||
+                                        locale.toLowerCase() === 'en_gb' ||
+                                        locale.toLowerCase() === 'en_au' ||
+                                        locale.toLowerCase() === 'en_ph' ||
+                                        locale.toLowerCase() === 'en_sg'
+                                    ) {
+                                        vodl.push(
+                                            download(
+                                                (await getFileBase(eventLink, cUrl)) +
+                                                    '/AudioLocales/' +
+                                                    `en_US/` +
+                                                    obj.letteringSfx.clipName +
+                                                    '.ogg',
+                                                path.join(
+                                                    ExportDir,
+                                                    'lol',
+                                                    eventName,
+                                                    eventSubpath.split('?')[0] || eventSubpath,
+                                                    'Assets',
+                                                    'Audio',
+                                                    'AudioLocales',
+                                                    'en_US'
+                                                )
+                                            )
+                                        );
+                                        continue;
+                                    }
+                                    vodl.push(
+                                        download(
+                                            (await getFileBase(eventLink, cUrl)) +
+                                                '/AudioLocales/' +
+                                                `${locale}/` +
+                                                `${locale}_${obj.letteringSfx.clipName}` +
+                                                '.ogg',
+                                            path.join(
+                                                ExportDir,
+                                                'lol',
+                                                eventName,
+                                                eventSubpath.split('?')[0] || eventSubpath,
+                                                'Assets',
+                                                'Audio',
+                                                'AudioLocales',
+                                                locale
+                                            )
+                                        )
+                                    );
+                                }
+                            }
+                        }
                     } catch {
-                        // empty
+                        //
                     }
                 }
-            } catch {
-                // empty
-            }
-        }
-
-        if (raw.includes('VO_')) {
-            try {
-                const values: any[] = getAllValues(JSON.parse(raw));
-
-                for (const value of values) {
-                    if (typeof value !== 'string') {
-                        continue;
-                    }
-
-                    if (!value.toLowerCase().includes('vo')) {
-                        continue;
-                    }
-
-                    vodl.push(downloadAllVO(eventName, eventSubpath, eventLink, value));
-                }
-            } catch {
-                // empty
             }
         }
     }
-
     await Promise.allSettled(monoDl);
     await Promise.allSettled(vodl);
     await Promise.allSettled(filesToDl);

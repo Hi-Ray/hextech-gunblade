@@ -87,7 +87,7 @@ export async function getTftHomePages(): Promise<object> {
  *   lol: LolData
  * }
  */
-export async function getHomepages(): Promise<any> {
+export async function getHomepages(): Promise<{ lol: LolData[] }> {
     const lolHomepages: LolData[] = await getLolHomepages();
     const tftHomePages = getTftHomePages();
 
@@ -108,13 +108,15 @@ export async function extractLolEvents(): Promise<string[]> {
 
     for (const homepage of homepages.lol) {
         if (homepage.action.type === 'lc_open_metagame') {
-            data.push(homepage.action.payload.url);
+            data.push(homepage.action.payload.url as string);
         }
 
         if (homepage.action.payload.tabId && homepage.action.type !== 'lc_home_tab') {
-            const location = homepage.action.payload.tabId;
+            data.push(homepage.action.payload.tabId as string);
+        }
 
-            data.push(location);
+        if (homepage.action.payload.tabId?.includes('comic')) {
+            data.push(homepage.action.payload.tabId as string);
         }
     }
 
@@ -160,21 +162,45 @@ export async function getExternallyHostedMetagames(eventNames: string[]): Promis
 
             const data: LolEventRoot = res.data;
             for (const blade of data.blades) {
-                if (!blade.links) {
+                if (blade.links) {
+                    for (const link of blade.links) {
+                        if (link.action?.type === 'lc_open_metagame') {
+                            if (link.action.payload.url) {
+                                events.push({
+                                    eventName: eventName,
+                                    link: link.action.payload.url.includes('{locale}')
+                                        ? replaceLocalePlaceholder(link.action.payload.url, 'en_GB')
+                                        : link.action.payload.url,
+                                    isMinigame: true,
+                                    subPath: link.action.payload.url.split('/').pop() || '',
+                                });
+                            }
+                        }
+                    }
                     continue;
                 }
 
-                for (const link of blade.links) {
-                    if (link.action?.type === 'lc_open_metagame') {
-                        if (link.action.payload.url) {
-                            events.push({
-                                eventName: eventName,
-                                link: link.action.payload.url.includes('{locale}')
-                                    ? replaceLocalePlaceholder(link.action.payload.url, 'en_GB')
-                                    : link.action.payload.url,
-                                isMinigame: true,
-                                subPath: link.action.payload.url.split('/').pop() || '',
-                            });
+                if (blade.header?.links) {
+                    for (const link of blade.header.links) {
+                        if (link.action?.type === 'lc_open_metagame') {
+                            if (link.action.payload.url) {
+                                console.debug({
+                                    eventName: eventName,
+                                    link: link.action.payload.url.includes('{locale}')
+                                        ? replaceLocalePlaceholder(link.action.payload.url, 'en_GB')
+                                        : link.action.payload.url,
+                                    isMinigame: true,
+                                    subPath: link.action.payload.url.split('/').pop() || '',
+                                });
+                                events.push({
+                                    eventName: eventName,
+                                    link: link.action.payload.url.includes('{locale}')
+                                        ? replaceLocalePlaceholder(link.action.payload.url, 'en_GB')
+                                        : link.action.payload.url,
+                                    isMinigame: true,
+                                    subPath: link.action.payload.url.split('/').pop() || '',
+                                });
+                            }
                         }
                     }
                 }
