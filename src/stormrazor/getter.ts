@@ -126,7 +126,7 @@ export async function downloadBinBundles(url: string, eventName: string, subPath
     if (catalogUrl?.includes('cdragon-bin')) {
     } else {
         if (catalogUrl) {
-            download(catalogUrl, binFileLocation);
+            await download(catalogUrl, binFileLocation);
         } else {
             throw new Error(`No catalog URL found for ${url}`);
         }

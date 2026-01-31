@@ -24,6 +24,11 @@ process.on('uncaughtException', (err) => {
     logger.error('💥 Uncaught Exception:', err.message);
 });
 
+process.on('SIGINT', () => {
+    console.log('Shutting down gracefully...');
+    process.exit(0);
+});
+
 // Date for the license notice
 export const currentYear = new Date().getFullYear();
 
