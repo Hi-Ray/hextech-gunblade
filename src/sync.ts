@@ -18,6 +18,8 @@ const config = {
     keepaliveInterval: 10000,
     keepaliveCountMax: 10,
     readyTimeout: 40000,
+    retries: 3,
+    retry_factor: 2,
 };
 
 /**
@@ -83,6 +85,8 @@ const getFileList = async (dirName: string): Promise<string[]> => {
     return files;
 };
 
+const existsCache = [];
+
 /**
  * Sync the data with the FTP share.
  *
@@ -90,13 +94,18 @@ const getFileList = async (dirName: string): Promise<string[]> => {
  */
 export const sync = async () => {
     checkEnvironment(true);
+
     const client = new sftp('infinityedge');
 
+    /**
+     * Internal helper to verify and restore connection if dropped
+     */
     const ensureConnection = async () => {
         try {
+            // Heartbeat check: realPath('.') is very fast
             await client.realPath('.');
         } catch {
-            logger.warn('SFTP connection lost, attempting to reconnect...');
+            logger.warn('SFTP connection dropped. Reconnecting...');
             await client.connect(config);
         }
     };
@@ -104,51 +113,70 @@ export const sync = async () => {
     await client.connect(config);
 
     client.on('error', (err) => logger.error('SFTP Error:', err.message));
-    client.on('close', () => logger.warn('SFTP Connection Closed.'));
+    client.on('close', () => logger.warn('SFTP Connection Closed'));
 
-    try {
+    await ensureConnection();
+    if (!(await client.exists('/data'))) {
+        logger.error('Could not find the data directory.');
+        process.exit(1);
+    }
+
+    await ensureConnection();
+    if (!(await client.exists(`/data/${currentYear}`))) {
+        await client.mkdir(`/data/${currentYear}`);
+    }
+
+    const folders = await getDirectories(ExportDir);
+    existsCache.push(ExportDir);
+    existsCache.push(`events/${currentYear}`);
+
+    for (const event of folders) {
         await ensureConnection();
-
-        if (!(await client.exists('/data'))) {
-            logger.error('Data directory missing on server.');
-            process.exit(1);
-        }
-
-        const folders = await getDirectories(ExportDir);
-
-        for (const event of folders) {
+        if (!(await client.exists(`data/${currentYear}/${event}`))) {
             const files = await getFileList(`events/${event}`);
 
             for (const file of files) {
-                const remotePath = file.startsWith('riot-client') ? '...' : '...';
+                if (file.startsWith('riot-client')) {
+                    const remotePath = `data/riot-client/${currentYear}/${currentMonth}/${
+                        file.match(/\//g)?.length === 1 ? file : file.replace('riot-client/', '')
+                    }`;
 
-                const performUpload = async () => {
                     await ensureConnection();
-
                     if (await client.exists(remotePath)) {
-                        return logger.info(`Skipping ${file} (Exists)`);
+                        logger.info('file exists skipping');
+                        continue;
                     }
 
                     const remoteDir = path.dirname(remotePath);
                     if (!(await client.exists(remoteDir))) {
+                        await ensureConnection();
                         await client.mkdir(remoteDir, true);
                     }
 
-                    logger.info(`Uploading: ${file}`);
+                    await ensureConnection();
                     await client.put(`events/${file}`, remotePath);
-                };
+                } else {
+                    const remotePath = `data/${currentYear}/${file.replace('lol/', '').replace('tft/', '')}`;
 
-                try {
-                    await performUpload();
-                } catch {
-                    logger.error(`Upload failed for ${file}, retrying once...`);
-                    await performUpload();
+                    await ensureConnection();
+                    if (await client.exists(remotePath)) {
+                        logger.info('file exists skipping');
+                        continue;
+                    }
+
+                    logger.info('Transferring file ' + remotePath);
+
+                    const remoteDir = path.dirname(remotePath);
+                    if (!(await client.exists(remoteDir))) {
+                        await ensureConnection();
+                        await client.mkdir(remoteDir, true);
+                    }
+
+                    await ensureConnection();
+                    await client.put(`events/${file}`, remotePath);
                 }
             }
         }
-    } catch (err: any) {
-        logger.fatal('Sync process interrupted:', err.message);
-    } finally {
-        await client.end();
     }
+    await client.end();
 };
