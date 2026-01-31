@@ -20,6 +20,7 @@ const config = {
     readyTimeout: 40000,
     retries: 3,
     retry_factor: 2,
+    debug: (msg: any) => console.error(msg),
 };
 
 /**
