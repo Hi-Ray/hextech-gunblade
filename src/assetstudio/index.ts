@@ -17,6 +17,7 @@ import { isValidUTF8, replaceLocalePlaceholder } from '@utils/string.ts';
 import { existsSync } from 'node:fs';
 import { flatten } from 'flat';
 import consts from '~/consts';
+import pLimit from 'p-limit';
 
 function getASOS() {
     switch (os.platform()) {
@@ -402,6 +403,7 @@ export async function downloadSFX(
 }
 
 export async function finalSweep(eventName: string, eventSubpath: string, eventLink: string) {
+    const limit = pLimit(10);
     const jsonFiles = await findFilesContaining(
         path.join(ExportDir, 'lol', eventName, eventSubpath.split('?')[0] || ''),
         '.json'
@@ -434,12 +436,14 @@ export async function finalSweep(eventName: string, eventSubpath: string, eventL
                     if (obj.panelSfx) {
                         for (const cUrl of consts.knownComicUrls) {
                             filesToDl.push(
-                                downloadSFX(
-                                    eventLink,
-                                    eventName,
-                                    eventSubpath,
-                                    cUrl,
-                                    obj.panelSfx.clipName ?? obj.SfxKey.clipName
+                                limit(() =>
+                                    downloadSFX(
+                                        eventLink,
+                                        eventName,
+                                        eventSubpath,
+                                        cUrl,
+                                        obj.panelSfx.clipName ?? obj.SfxKey.clipName
+                                    )
                                 )
                             );
                         }
@@ -447,7 +451,9 @@ export async function finalSweep(eventName: string, eventSubpath: string, eventL
                         for (const cUrl of consts.knownComicUrls) {
                             for (const key of obj.uiAudioKeys) {
                                 filesToDl.push(
-                                    downloadSFX(eventLink, eventName, eventSubpath, cUrl, key)
+                                    limit(() =>
+                                        downloadSFX(eventLink, eventName, eventSubpath, cUrl, key)
+                                    )
                                 );
                             }
                         }
@@ -455,7 +461,9 @@ export async function finalSweep(eventName: string, eventSubpath: string, eventL
                         for (const cUrl of consts.knownComicUrls) {
                             for (const key of obj.audioEvents) {
                                 filesToDl.push(
-                                    downloadSFX(eventLink, eventName, eventSubpath, cUrl, key)
+                                    limit(() =>
+                                        downloadSFX(eventLink, eventName, eventSubpath, cUrl, key)
+                                    )
                                 );
                             }
                         }
@@ -471,12 +479,14 @@ export async function finalSweep(eventName: string, eventSubpath: string, eventL
                             ) {
                                 for (const cUrl of consts.knownComicUrls) {
                                     filesToDl.push(
-                                        downloadSFX(
-                                            eventLink,
-                                            eventName,
-                                            eventSubpath,
-                                            cUrl,
-                                            flat[key]
+                                        limit(() =>
+                                            downloadSFX(
+                                                eventLink,
+                                                eventName,
+                                                eventSubpath,
+                                                cUrl,
+                                                flat[key]
+                                            )
                                         )
                                     );
                                 }
@@ -503,11 +513,35 @@ export async function finalSweep(eventName: string, eventSubpath: string, eventL
                                         locale.toLowerCase() === 'en_sg'
                                     ) {
                                         vodl.push(
+                                            limit(async () =>
+                                                download(
+                                                    (await getFileBase(eventLink, cUrl)) +
+                                                        '/AudioLocales/' +
+                                                        `en_US/` +
+                                                        obj.letteringSfx.clipName +
+                                                        '.ogg',
+                                                    path.join(
+                                                        ExportDir,
+                                                        'lol',
+                                                        eventName,
+                                                        eventSubpath.split('?')[0] || eventSubpath,
+                                                        'Assets',
+                                                        'Audio',
+                                                        'AudioLocales',
+                                                        'en_US'
+                                                    )
+                                                )
+                                            )
+                                        );
+                                        continue;
+                                    }
+                                    vodl.push(
+                                        limit(async () =>
                                             download(
                                                 (await getFileBase(eventLink, cUrl)) +
                                                     '/AudioLocales/' +
-                                                    `en_US/` +
-                                                    obj.letteringSfx.clipName +
+                                                    `${locale}/` +
+                                                    `${locale}_${obj.letteringSfx.clipName}` +
                                                     '.ogg',
                                                 path.join(
                                                     ExportDir,
@@ -517,28 +551,8 @@ export async function finalSweep(eventName: string, eventSubpath: string, eventL
                                                     'Assets',
                                                     'Audio',
                                                     'AudioLocales',
-                                                    'en_US'
+                                                    locale
                                                 )
-                                            )
-                                        );
-                                        continue;
-                                    }
-                                    vodl.push(
-                                        download(
-                                            (await getFileBase(eventLink, cUrl)) +
-                                                '/AudioLocales/' +
-                                                `${locale}/` +
-                                                `${locale}_${obj.letteringSfx.clipName}` +
-                                                '.ogg',
-                                            path.join(
-                                                ExportDir,
-                                                'lol',
-                                                eventName,
-                                                eventSubpath.split('?')[0] || eventSubpath,
-                                                'Assets',
-                                                'Audio',
-                                                'AudioLocales',
-                                                locale
                                             )
                                         )
                                     );
