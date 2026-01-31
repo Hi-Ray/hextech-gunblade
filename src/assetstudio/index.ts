@@ -1,5 +1,4 @@
 import os from 'os';
-import process from 'process';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -64,16 +63,13 @@ export async function useAssetStudioWin(
             path.join(ExportDir, 'lol', eventName, subEvent || ''),
         ],
         {
-            stdout: 'pipe',
-            stderr: 'pipe',
+            stdout: 'inherit',
+            stderr: 'inherit',
         }
     );
 
-    for await (const chunk of proc.stdout) {
-        process.stdout.write(new TextDecoder().decode(chunk));
-    }
-
-    logger.info(`Process exited with code ${await proc.exited}`);
+    const exitCode = await proc.exited;
+    logger.info(`Process exited with code ${exitCode}`);
 }
 
 export async function useAssetStudioMacLin(
@@ -89,14 +85,10 @@ export async function useAssetStudioMacLin(
             path.join(ExportDir, 'lol', eventName, subEvent || ''),
         ],
         {
-            stdout: 'pipe',
-            stderr: 'pipe',
+            stdout: 'inherit',
+            stderr: 'inherit',
         }
     );
-
-    for await (const chunk of proc.stdout) {
-        process.stdout.write(new TextDecoder().decode(chunk));
-    }
 
     logger.info(`Process exited with code ${await proc.exited}`);
 }

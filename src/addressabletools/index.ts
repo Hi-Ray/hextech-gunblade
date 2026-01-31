@@ -36,25 +36,22 @@ export async function useAddressableTools(binFile: string) {
 
     const proc = Bun.spawn([path.join(toolsLocation, `Example${exe}`), 'searchasset', binFile], {
         stdin: 'pipe',
-        stdout: 'pipe',
-        stderr: 'pipe',
+        stdout: 'inherit',
+        stderr: 'inherit',
     });
 
     proc.stdin.write('\n');
     proc.stdin.end();
 
-    const stdout = await new Response(proc.stdout).text();
-    const stderr = await new Response(proc.stderr).text();
     const exitCode = await proc.exited;
 
-    logger.info('Exiting addressableTools');
-    if (stderr.trim()) {
-        logger.warn(`Tool Stderr: ${stderr.trim()}`);
+    logger.info(`Exiting addressableTools, exit code ${exitCode}`);
+
+    if (exitCode !== 0) {
+        throw new Error('AddressableTools failed');
     }
 
-    logger.info(`Process exited with code ${exitCode}`);
-
-    return stdout;
+    return '';
 }
 
 export async function getBinBundles(binData: string) {

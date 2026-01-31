@@ -12,6 +12,8 @@ import { checkEnvironment, sync } from '~/sync.ts';
 import downloadDirectory from '@utils/cddd.ts';
 import { copyRecursive } from '@utils/file.ts';
 
+import pLimit from 'p-limit';
+
 import path from 'path';
 
 import { ExportDir, TempDir } from '~/dirs.ts';
@@ -31,6 +33,7 @@ process.on('SIGINT', () => {
 
 // Date for the license notice
 export const currentYear = new Date().getFullYear();
+const limit = pLimit(2);
 
 // License notice
 console.log(
@@ -91,7 +94,7 @@ for await (const event of events) {
     }
 
     for await (const event of events) {
-        bundles.push(downloadBundles(event.link, event.eventName, event.subPath));
+        bundles.push(limit(() => downloadBundles(event.link, event.eventName, event.subPath)));
     }
 
     const bundlesResult = await Promise.allSettled(bundles);
@@ -128,9 +131,9 @@ for await (const event of events) {
             continue;
         }
 
-        audioDownload.push(downloadAudio(list));
+        audioDownload.push(limit(() => downloadAudio(list)));
 
-        final.push(finalSweep(event.eventName, event.subPath, event.link));
+        final.push(limit(() => finalSweep(event.eventName, event.subPath, event.link)));
     }
 
     const adP = await Promise.allSettled(audioDownload);

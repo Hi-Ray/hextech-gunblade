@@ -13,8 +13,10 @@ import {
     useAddressableTools,
 } from '~/addressabletools';
 import consts from '~/consts.ts';
+import pLimit from 'p-limit';
 
 const cache = new Map<string, string>();
+const limit = pLimit(10);
 
 export async function getFileBase(url: string, path?: string): Promise<string> {
     try {
@@ -155,9 +157,11 @@ export async function downloadBinBundles(url: string, eventName: string, subPath
 
     for (const bundle of bundles) {
         bundlesDL.push(
-            download(
-                bundle,
-                path.join(TempDir, eventName, subPath.split('?')[0] || subPath, 'bundles')
+            limit(() =>
+                download(
+                    bundle,
+                    path.join(TempDir, eventName, subPath.split('?')[0] || subPath, 'bundles')
+                )
             )
         );
     }
@@ -194,9 +198,11 @@ export async function downloadJsonBundles(url: string, eventName: string, subPat
 
     for (const bundle of bundles) {
         bundlesDL.push(
-            download(
-                bundle,
-                path.join(TempDir, eventName, subPath.split('?')[0] || subPath, 'bundles')
+            limit(() =>
+                download(
+                    bundle,
+                    path.join(TempDir, eventName, subPath.split('?')[0] || subPath, 'bundles')
+                )
             )
         );
     }
