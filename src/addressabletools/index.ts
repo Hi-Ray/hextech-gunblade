@@ -36,28 +36,29 @@ export async function useAddressableTools(binFile: string) {
 
     const proc = Bun.spawn([path.join(toolsLocation, `Example${exe}`), 'searchasset', binFile], {
         stdin: 'pipe',
-        stdout: 'inherit',
+        stdout: 'pipe',
         stderr: 'inherit',
     });
 
     proc.stdin.write('\n');
     proc.stdin.end();
 
+    const output = await new Response(proc.stdout).text();
+
     const exitCode = await proc.exited;
 
     logger.info(`Exiting addressableTools, exit code ${exitCode}`);
 
     if (exitCode !== 0) {
-        throw new Error('AddressableTools failed');
+        throw new Error(`AddressableTools failed with output: ${output}`);
     }
 
-    return '';
+    return output.trim();
 }
 
 export async function getBinBundles(binData: string) {
     const regex = /\{UnityEngine\.AddressableAssets\.Addressables\.RuntimePath\}.*?\.bundle/gimu;
     const matches = binData.match(regex) || [];
 
-    // Clean and return unique results
     return [...new Set(matches.map((m) => m.replace(/\r/g, '')))];
 }
