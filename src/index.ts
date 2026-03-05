@@ -18,7 +18,7 @@ import path from 'path';
 
 import { ExportDir, TempDir } from '~/dirs.ts';
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason, _) => {
     logger.debug('💥 Unhandled rejection:', reason);
 });
 
@@ -60,9 +60,12 @@ logger.info('Checking environment variables');
 const ftp = checkEnvironment();
 
 logger.warn('Getting lol events');
-const events = await getLolEvents();
+let events = await getLolEvents();
 
 const bundles: Promise<void>[] = [];
+
+// While raw is experiencing server issues
+events = events.filter((e) => !e.link.startsWith('/fe'));
 
 for await (const event of events) {
     if (event.link.startsWith('/fe/')) {
@@ -139,7 +142,7 @@ for await (const event of events) {
     const adP = await Promise.allSettled(audioDownload);
     const finalP = await Promise.allSettled(final);
 
-    adP.forEach((audio, i) => {
+    adP.forEach((audio) => {
         if (audio.status === 'fulfilled') {
             logger.info(`Audio Downloaded`);
         }
