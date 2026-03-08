@@ -60,12 +60,9 @@ logger.info('Checking environment variables');
 const ftp = checkEnvironment();
 
 logger.warn('Getting lol events');
-let events = await getLolEvents();
+const events = await getLolEvents();
 
 const bundles: Promise<void>[] = [];
-
-// While raw is experiencing server issues
-events = events.filter((e) => !e.link.startsWith('/fe'));
 
 for await (const event of events) {
     if (event.link.startsWith('/fe/')) {
