@@ -14,16 +14,6 @@ const homepageUrls = {
     tft: 'https://clientconfig.bangingheads.net/api/v1/config/public?namespace=lol.client_settings.tft',
 };
 
-const riotClientManifests = [
-    'https://lol.secure.dyn.riotcdn.net/channels/public/rccontent/tft/theme/manifest.json',
-    'https://riot-client.secure.dyn.riotcdn.net/channels/public/rccontent/arcane/theme/manifest.json',
-    'https://wildrift.secure.dyn.riotcdn.net/channels/public/rccontent/theme/manifest.json',
-    'https://valorant.secure.dyn.riotcdn.net/channels/public/rccontent/theme/03/manifest.json',
-    'https://bacon.secure.dyn.riotcdn.net/channels/public/rccontent/theme/manifest.json',
-    'https://lol.secure.dyn.riotcdn.net/channels/public/rccontent/theme/manifest_default.json',
-    'https://riot-client.secure.dyn.riotcdn.net/channels/public/rccontent/theme/manifest_live.json',
-];
-
 const eventUrls = {
     lol: 'https://content.publishing.riotgames.com/publishing-content/v2.0/public/channel/league_of_legends_client/page/{event}?locale={locale}',
 };
