@@ -17,6 +17,7 @@ import pLimit from 'p-limit';
 import path from 'path';
 
 import { ExportDir, TempDir } from '~/dirs.ts';
+import { scrapeRiotClient } from '~/riot-client/scraper';
 
 process.on('unhandledRejection', (reason, _) => {
     logger.debug('💥 Unhandled rejection:', reason);
@@ -63,6 +64,10 @@ logger.warn('Getting lol events');
 const events = await getLolEvents();
 
 const bundles: Promise<void>[] = [];
+
+logger.warn('Downloading Riot Client assets');
+
+scrapeRiotClient();
 
 for await (const event of events) {
     if (event.link.startsWith('/fe/')) {
