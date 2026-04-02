@@ -66,13 +66,7 @@ export const scrapeRiotClient = () =>
         for (const file of foundFiles) {
             const fileUrl = new URL(file, pathWithoutFile).href;
 
-            const exportPath = path.join(
-                ExportDir,
-                'riot-client',
-                new Date().getFullYear().toString(),
-                (new Date().getMonth() + 1).toString().padStart(2, '0'),
-                getGame(manifest)
-            );
+            const exportPath = path.join(ExportDir, 'riot-client', getGame(manifest));
 
             try {
                 await download(fileUrl, exportPath);
