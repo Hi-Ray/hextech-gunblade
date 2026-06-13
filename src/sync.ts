@@ -155,7 +155,13 @@ export const sync = async () => {
                     }
 
                     await ensureConnection();
-                    await client.put(`events/${file}`, remotePath);
+                    try {
+                        await client.put(`events/${file}`, remotePath);
+                    } catch {
+                        logger.warn(
+                            `Failed to upload file most likely does not exist: events/${file}`
+                        );
+                    }
                 } else {
                     const remotePath = `data/${currentYear}/${file.replace('lol/', '').replace('tft/', '')}`;
 
@@ -174,7 +180,14 @@ export const sync = async () => {
                     }
 
                     await ensureConnection();
-                    await client.put(`events/${file}`, remotePath);
+
+                    try {
+                        await client.put(`events/${file}`, remotePath);
+                    } catch {
+                        logger.warn(
+                            `Failed to upload file most likely does not exist: events/${file}`
+                        );
+                    }
                 }
             }
         }
